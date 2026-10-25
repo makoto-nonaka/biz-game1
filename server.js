@@ -24,9 +24,15 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
     const mine = g.companies.find(c => c.id === companyId);
     const rules=g.modelVersion===4?RULES:g.modelVersion===3?V3_RULES:OLD_RULES;
     const studentRules=Object.fromEntries(['version','rounds','customersPerCompany','baseCost','variableCost','freeRevenue','conversionRate','prices','investments','switchingCostPerFullShift'].filter(k=>rules[k]!==undefined).map(k=>[k,rules[k]]));
+    const marketCounts=r=>Object.fromEntries(['android','ios'].map(m=>[m,{customers:r.markets?.[m]?.customers??(r.market===m?r.customers:0)}]));
     const history=role==='teacher'?g.history:g.history.map(h=>({...h,results:h.results.map(r=>{
+      if(r.companyId!==companyId){
+        // 他社は市場に表れた結果だけを返す。新規内部フィールドも漏れないよう許可リスト方式。
+        return {companyId:r.companyId,name:r.name,businessModel:r.businessModel||'paid',price:r.price,
+          customers:r.customers,markets:marketCounts(r)};
+      }
       const {resourcesBefore,resourcesAfter,...visible}=r;
-      if(visible.markets)visible.markets=Object.fromEntries(Object.entries(visible.markets).map(([m,a])=>[m,{customers:a.customers,competitors:a.competitors}]));
+      visible.markets=marketCounts(r);
       return visible;
     })}));
     return { code: g.code, title: g.title, round: g.round, phase: g.phase, rules: role==='teacher'?rules:studentRules,

@@ -188,3 +188,32 @@ test('既存v0.3ゲームは蓄積・移行費用を追加せず維持する',as
  const r=await fetch(`http://127.0.0.1:${server.address().port}/api/games/432/settle`,{method:'POST',headers:{Authorization:'Bearer teacher-v3','Content-Type':'application/json'},body:JSON.stringify({round:2})});
  assert.equal(r.status,200);const v=await r.json();assert.equal(v.rules.version,3);assert.ok(!('resourcesAfter' in v.history.at(-1).results[0]));assert.equal(v.history.at(-1).results[0].fixedCost,1000000);
 });
+
+test('他社の経営情報はAPIでも非開示、自社と教員は詳細を確認できる',async t=>{
+ const dir=mkdtempSync(join(tmpdir(),'startup-disclosure-'));
+ const server=createApp({dataDir:dir});await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ t.after(async()=>{await new Promise(r=>server.close(r));rmSync(dir,{recursive:true,force:true});});
+ const base=`http://127.0.0.1:${server.address().port}`;
+ async function call(path,data,token){const r=await fetch(base+path,{method:data?'POST':'GET',headers:{...(data?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`}:{})},...(data?{body:JSON.stringify(data)}:{})});assert.ok(r.ok);return r.json();}
+ const teacher=await call('/api/games',{title:'開示確認'}),path=`/api/games/${teacher.code}`;
+ const a=await call(path+'/join',{name:'A'}),b=await call(path+'/join',{name:'B'});
+ await call(path+'/decision',{round:1,iosPercent:25,businessModel:'paid',price:500,development:1000000,advertising:500000},a.token);
+ await call(path+'/decision',{round:1,iosPercent:70,businessModel:'freemium',price:700,development:0,advertising:1000000},b.token);
+ const admin=await call(path+'/settle',{round:1},teacher.token);
+ const expectedKeys=['businessModel','companyId','customers','markets','name','price'].sort();
+ for(const [student,other]of [[a,b],[b,a]]){
+  const view=await call(path,undefined,student.token),rows=view.history[0].results;
+  const own=rows.find(r=>r.companyId===student.companyId),rival=rows.find(r=>r.companyId===other.companyId);
+  assert.deepEqual(Object.keys(rival).sort(),expectedKeys);
+  for(const m of ['android','ios'])assert.deepEqual(Object.keys(rival.markets[m]),['customers']);
+  assert.equal(rival.customers,rival.markets.android.customers+rival.markets.ios.customers);
+  for(const k of ['iosPercent','development','advertising','switchingCost','fixedCost','variableCost','cost','profit','breakEven','revenue','revenuePerCustomer','adRevenue','paymentRevenue','resourcesBefore','resourcesAfter'])assert.ok(!(k in rival),k);
+  for(const k of ['iosPercent','development','advertising','switchingCost','fixedCost','variableCost','cost','profit','breakEven','revenue'])assert.ok(k in own,k);
+  assert.ok(!('resourcesBefore' in own));assert.ok(!('segments' in own.markets.android));
+  assert.equal(view.ranking.length,2);assert.ok(view.ranking.every(r=>'profit' in r));
+ }
+ assert.ok(admin.history[0].results.every(r=>'resourcesBefore' in r&&'iosPercent' in r&&'breakEven' in r));
+ // レスポンス整形が保存データを削っていないことも確認。
+ const again=await call(path,undefined,teacher.token);
+ assert.deepEqual(again.history,admin.history);
+});
