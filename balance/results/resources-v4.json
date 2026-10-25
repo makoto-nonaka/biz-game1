@@ -1,0 +1,196 @@
+{
+  "note": "同じランダム意思決定を両版に与えた3ラウンド比較。実際の生徒の行動予測ではない。",
+  "simulations": [
+    {
+      "n": 2,
+      "games": 1000,
+      "seed": 20261027,
+      "maximumCustomerShift": 0.0431832202344232,
+      "leaderChangesRate": 0.014,
+      "versions": [
+        {
+          "version": 3,
+          "rounds": [
+            {
+              "round": 1,
+              "lossRate": 0.3565,
+              "meanProfit": 420163,
+              "meanSwitchingCost": 0
+            },
+            {
+              "round": 2,
+              "lossRate": 0.3645,
+              "meanProfit": 430635,
+              "meanSwitchingCost": 0
+            },
+            {
+              "round": 3,
+              "lossRate": 0.35,
+              "meanProfit": 433782,
+              "meanSwitchingCost": 0
+            }
+          ],
+          "cumulativeLossRate": 0.236
+        },
+        {
+          "version": 4,
+          "rounds": [
+            {
+              "round": 1,
+              "lossRate": 0.3565,
+              "meanProfit": 420163,
+              "meanSwitchingCost": 0
+            },
+            {
+              "round": 2,
+              "lossRate": 0.399,
+              "meanProfit": 349056,
+              "meanSwitchingCost": 81600
+            },
+            {
+              "round": 3,
+              "lossRate": 0.3825,
+              "meanProfit": 357124,
+              "meanSwitchingCost": 76650
+            }
+          ],
+          "cumulativeLossRate": 0.2745
+        }
+      ]
+    },
+    {
+      "n": 20,
+      "games": 1000,
+      "seed": 20261045,
+      "maximumCustomerShift": 0.053409090909090906,
+      "leaderChangesRate": 0.086,
+      "versions": [
+        {
+          "version": 3,
+          "rounds": [
+            {
+              "round": 1,
+              "lossRate": 0.25915,
+              "meanProfit": 425463,
+              "meanSwitchingCost": 0
+            },
+            {
+              "round": 2,
+              "lossRate": 0.2582,
+              "meanProfit": 432460,
+              "meanSwitchingCost": 0
+            },
+            {
+              "round": 3,
+              "lossRate": 0.2631,
+              "meanProfit": 421810,
+              "meanSwitchingCost": 0
+            }
+          ],
+          "cumulativeLossRate": 0.125
+        },
+        {
+          "version": 4,
+          "rounds": [
+            {
+              "round": 1,
+              "lossRate": 0.25915,
+              "meanProfit": 425463,
+              "meanSwitchingCost": 0
+            },
+            {
+              "round": 2,
+              "lossRate": 0.30305,
+              "meanProfit": 352225,
+              "meanSwitchingCost": 80255
+            },
+            {
+              "round": 3,
+              "lossRate": 0.3101,
+              "meanProfit": 341788,
+              "meanSwitchingCost": 79963
+            }
+          ],
+          "cumulativeLossRate": 0.16295
+        }
+      ]
+    },
+    {
+      "n": 30,
+      "games": 1000,
+      "seed": 20261055,
+      "maximumCustomerShift": 0.053992740471869326,
+      "leaderChangesRate": 0.101,
+      "versions": [
+        {
+          "version": 3,
+          "rounds": [
+            {
+              "round": 1,
+              "lossRate": 0.2543,
+              "meanProfit": 422306,
+              "meanSwitchingCost": 0
+            },
+            {
+              "round": 2,
+              "lossRate": 0.2576333333333333,
+              "meanProfit": 422396,
+              "meanSwitchingCost": 0
+            },
+            {
+              "round": 3,
+              "lossRate": 0.25733333333333336,
+              "meanProfit": 426941,
+              "meanSwitchingCost": 0
+            }
+          ],
+          "cumulativeLossRate": 0.11966666666666667
+        },
+        {
+          "version": 4,
+          "rounds": [
+            {
+              "round": 1,
+              "lossRate": 0.2543,
+              "meanProfit": 422306,
+              "meanSwitchingCost": 0
+            },
+            {
+              "round": 2,
+              "lossRate": 0.3061,
+              "meanProfit": 342446,
+              "meanSwitchingCost": 79958
+            },
+            {
+              "round": 3,
+              "lossRate": 0.30233333333333334,
+              "meanProfit": 346247,
+              "meanSwitchingCost": 80608
+            }
+          ],
+          "cumulativeLossRate": 0.15786666666666666
+        }
+      ]
+    }
+  ],
+  "example": [
+    {
+      "name": "経験あり",
+      "customers": 6106,
+      "profit": 942400,
+      "resourcesBefore": {
+        "android": 500000,
+        "ios": 500000
+      }
+    },
+    {
+      "name": "経験なし",
+      "customers": 5894,
+      "profit": 857600,
+      "resourcesBefore": {
+        "android": 0,
+        "ios": 0
+      }
+    }
+  ]
+}

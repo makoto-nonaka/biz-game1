@@ -1,0 +1,289 @@
+{
+  "examples": [
+    {
+      "n": 2,
+      "model": "free",
+      "investment": 0,
+      "customers": 6000,
+      "revenue": 2400000,
+      "cost": 1100000,
+      "profit": 1300000,
+      "breakEven": 1667
+    },
+    {
+      "n": 2,
+      "model": "free",
+      "investment": 500000,
+      "customers": 6000,
+      "revenue": 2400000,
+      "cost": 2100000,
+      "profit": 300000,
+      "breakEven": 5000
+    },
+    {
+      "n": 2,
+      "model": "free",
+      "investment": 1000000,
+      "customers": 6000,
+      "revenue": 2400000,
+      "cost": 3100000,
+      "profit": -700000,
+      "breakEven": 8334
+    },
+    {
+      "n": 2,
+      "model": "freemium",
+      "investment": 0,
+      "customers": 6000,
+      "revenue": 2640000,
+      "cost": 1100000,
+      "profit": 1540000,
+      "breakEven": 1471
+    },
+    {
+      "n": 2,
+      "model": "freemium",
+      "investment": 500000,
+      "customers": 6000,
+      "revenue": 2640000,
+      "cost": 2100000,
+      "profit": 540000,
+      "breakEven": 4412
+    },
+    {
+      "n": 2,
+      "model": "freemium",
+      "investment": 1000000,
+      "customers": 6000,
+      "revenue": 2640000,
+      "cost": 3100000,
+      "profit": -460000,
+      "breakEven": 7353
+    },
+    {
+      "n": 2,
+      "model": "paid",
+      "investment": 0,
+      "customers": 6000,
+      "revenue": 3000000,
+      "cost": 1100000,
+      "profit": 1900000,
+      "breakEven": 1250
+    },
+    {
+      "n": 2,
+      "model": "paid",
+      "investment": 500000,
+      "customers": 6000,
+      "revenue": 3000000,
+      "cost": 2100000,
+      "profit": 900000,
+      "breakEven": 3750
+    },
+    {
+      "n": 2,
+      "model": "paid",
+      "investment": 1000000,
+      "customers": 6000,
+      "revenue": 3000000,
+      "cost": 3100000,
+      "profit": -100000,
+      "breakEven": 6250
+    },
+    {
+      "n": 20,
+      "model": "free",
+      "investment": 0,
+      "customers": 6000,
+      "revenue": 2400000,
+      "cost": 1100000,
+      "profit": 1300000,
+      "breakEven": 1667
+    },
+    {
+      "n": 20,
+      "model": "free",
+      "investment": 500000,
+      "customers": 6000,
+      "revenue": 2400000,
+      "cost": 2100000,
+      "profit": 300000,
+      "breakEven": 5000
+    },
+    {
+      "n": 20,
+      "model": "free",
+      "investment": 1000000,
+      "customers": 6000,
+      "revenue": 2400000,
+      "cost": 3100000,
+      "profit": -700000,
+      "breakEven": 8334
+    },
+    {
+      "n": 20,
+      "model": "freemium",
+      "investment": 0,
+      "customers": 6000,
+      "revenue": 2640000,
+      "cost": 1100000,
+      "profit": 1540000,
+      "breakEven": 1471
+    },
+    {
+      "n": 20,
+      "model": "freemium",
+      "investment": 500000,
+      "customers": 6000,
+      "revenue": 2640000,
+      "cost": 2100000,
+      "profit": 540000,
+      "breakEven": 4412
+    },
+    {
+      "n": 20,
+      "model": "freemium",
+      "investment": 1000000,
+      "customers": 6000,
+      "revenue": 2640000,
+      "cost": 3100000,
+      "profit": -460000,
+      "breakEven": 7353
+    },
+    {
+      "n": 20,
+      "model": "paid",
+      "investment": 0,
+      "customers": 6000,
+      "revenue": 3000000,
+      "cost": 1100000,
+      "profit": 1900000,
+      "breakEven": 1250
+    },
+    {
+      "n": 20,
+      "model": "paid",
+      "investment": 500000,
+      "customers": 6000,
+      "revenue": 3000000,
+      "cost": 2100000,
+      "profit": 900000,
+      "breakEven": 3750
+    },
+    {
+      "n": 20,
+      "model": "paid",
+      "investment": 1000000,
+      "customers": 6000,
+      "revenue": 3000000,
+      "cost": 3100000,
+      "profit": -100000,
+      "breakEven": 6250
+    },
+    {
+      "n": 30,
+      "model": "free",
+      "investment": 0,
+      "customers": 6000,
+      "revenue": 2400000,
+      "cost": 1100000,
+      "profit": 1300000,
+      "breakEven": 1667
+    },
+    {
+      "n": 30,
+      "model": "free",
+      "investment": 500000,
+      "customers": 6000,
+      "revenue": 2400000,
+      "cost": 2100000,
+      "profit": 300000,
+      "breakEven": 5000
+    },
+    {
+      "n": 30,
+      "model": "free",
+      "investment": 1000000,
+      "customers": 6000,
+      "revenue": 2400000,
+      "cost": 3100000,
+      "profit": -700000,
+      "breakEven": 8334
+    },
+    {
+      "n": 30,
+      "model": "freemium",
+      "investment": 0,
+      "customers": 6000,
+      "revenue": 2640000,
+      "cost": 1100000,
+      "profit": 1540000,
+      "breakEven": 1471
+    },
+    {
+      "n": 30,
+      "model": "freemium",
+      "investment": 500000,
+      "customers": 6000,
+      "revenue": 2640000,
+      "cost": 2100000,
+      "profit": 540000,
+      "breakEven": 4412
+    },
+    {
+      "n": 30,
+      "model": "freemium",
+      "investment": 1000000,
+      "customers": 6000,
+      "revenue": 2640000,
+      "cost": 3100000,
+      "profit": -460000,
+      "breakEven": 7353
+    },
+    {
+      "n": 30,
+      "model": "paid",
+      "investment": 0,
+      "customers": 6000,
+      "revenue": 3000000,
+      "cost": 1100000,
+      "profit": 1900000,
+      "breakEven": 1250
+    },
+    {
+      "n": 30,
+      "model": "paid",
+      "investment": 500000,
+      "customers": 6000,
+      "revenue": 3000000,
+      "cost": 2100000,
+      "profit": 900000,
+      "breakEven": 3750
+    },
+    {
+      "n": 30,
+      "model": "paid",
+      "investment": 1000000,
+      "customers": 6000,
+      "revenue": 3000000,
+      "cost": 3100000,
+      "profit": -100000,
+      "breakEven": 6250
+    }
+  ],
+  "acceptance": {
+    "finalSeeds": [
+      845202,
+      845220,
+      845230
+    ],
+    "simultaneousAdaptiveMaxLossUnder50for20and30": true,
+    "allModelsBestResponse20and30": true,
+    "random30LossUnder50": true,
+    "eachModelCanLead20and30": true,
+    "noModelOver70Lead20and30": true,
+    "eachModelMajorityProfitable20and30": true,
+    "defaultSymmetricAllModelsProfitable": true,
+    "allPriceLevelsBestSomewhere": true
+  }
+}

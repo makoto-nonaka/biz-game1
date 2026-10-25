@@ -1,0 +1,46 @@
+[
+  {
+    "n": 20,
+    "rooms": 500,
+    "rounds": [
+      {
+        "round": 1,
+        "lossRate": 0.2648,
+        "meanProfit": 423564
+      },
+      {
+        "round": 2,
+        "lossRate": 0.159,
+        "meanProfit": 365572
+      },
+      {
+        "round": 3,
+        "lossRate": 0.1217,
+        "meanProfit": 353351
+      }
+    ],
+    "cumulativeLossRate": 0.1184
+  },
+  {
+    "n": 30,
+    "rooms": 500,
+    "rounds": [
+      {
+        "round": 1,
+        "lossRate": 0.2648,
+        "meanProfit": 415889
+      },
+      {
+        "round": 2,
+        "lossRate": 0.1848,
+        "meanProfit": 326704
+      },
+      {
+        "round": 3,
+        "lossRate": 0.1604,
+        "meanProfit": 308287
+      }
+    ],
+    "cumulativeLossRate": 0.1364
+  }
+]

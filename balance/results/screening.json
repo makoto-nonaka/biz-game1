@@ -1,0 +1,336 @@
+{
+  "selected": {
+    "id": "W1",
+    "demand": 6000,
+    "baseCost": 500000,
+    "freeRevenue": 400,
+    "conversion": 0.4,
+    "variable": [
+      100,
+      100,
+      100
+    ],
+    "freemiumAds": true,
+    "priceTable": true,
+    "levelMax": 1.35,
+    "premiumPrice": 0.7,
+    "effortExponent": 0.7
+  },
+  "scenarios": [
+    {
+      "n": 2,
+      "rooms": 5000,
+      "seed": 938519,
+      "composition": [
+        0.3333333333333333,
+        0.3333333333333333,
+        0.3333333333333333
+      ],
+      "lossRate": 0.3522,
+      "allLossRate": 0.118,
+      "models": [
+        {
+          "model": "free",
+          "count": 3334,
+          "lossRate": 0.3713257348530294,
+          "meanProfit": 283139,
+          "firstCredit": 0.319
+        },
+        {
+          "model": "freemium",
+          "count": 3370,
+          "lossRate": 0.30178041543026707,
+          "meanProfit": 493669,
+          "firstCredit": 0.3806
+        },
+        {
+          "model": "paid",
+          "count": 3296,
+          "lossRate": 0.38440533980582525,
+          "meanProfit": 506171,
+          "firstCredit": 0.3004
+        }
+      ]
+    },
+    {
+      "n": 20,
+      "rooms": 5000,
+      "seed": 938537,
+      "composition": [
+        0.3333333333333333,
+        0.3333333333333333,
+        0.3333333333333333
+      ],
+      "lossRate": 0.26757,
+      "allLossRate": 0,
+      "models": [
+        {
+          "model": "free",
+          "count": 33507,
+          "lossRate": 0.1666218999015131,
+          "meanProfit": 494751,
+          "firstCredit": 0.1704
+        },
+        {
+          "model": "freemium",
+          "count": 33339,
+          "lossRate": 0.2995890698581241,
+          "meanProfit": 428291,
+          "firstCredit": 0.4242
+        },
+        {
+          "model": "paid",
+          "count": 33154,
+          "lossRate": 0.3373951861012246,
+          "meanProfit": 338409,
+          "firstCredit": 0.4054
+        }
+      ]
+    },
+    {
+      "n": 30,
+      "rooms": 5000,
+      "seed": 938547,
+      "composition": [
+        0.3333333333333333,
+        0.3333333333333333,
+        0.3333333333333333
+      ],
+      "lossRate": 0.25822666666666666,
+      "allLossRate": 0,
+      "models": [
+        {
+          "model": "free",
+          "count": 49860,
+          "lossRate": 0.14675090252707582,
+          "meanProfit": 499544,
+          "firstCredit": 0.1194
+        },
+        {
+          "model": "freemium",
+          "count": 50256,
+          "lossRate": 0.29703915950334286,
+          "meanProfit": 423334,
+          "firstCredit": 0.4142
+        },
+        {
+          "model": "paid",
+          "count": 49884,
+          "lossRate": 0.3305468687354663,
+          "meanProfit": 340781,
+          "firstCredit": 0.4664
+        }
+      ]
+    },
+    {
+      "n": 30,
+      "rooms": 1000,
+      "seed": 814903,
+      "composition": [
+        0.7,
+        0.15,
+        0.15
+      ],
+      "lossRate": 0.24756666666666666,
+      "allLossRate": 0,
+      "models": [
+        {
+          "model": "free",
+          "count": 20930,
+          "lossRate": 0.2908265647396082,
+          "meanProfit": 163566,
+          "firstCredit": 0.002
+        },
+        {
+          "model": "freemium",
+          "count": 4530,
+          "lossRate": 0.16048565121412803,
+          "meanProfit": 689147,
+          "firstCredit": 0.184
+        },
+        {
+          "model": "paid",
+          "count": 4540,
+          "lossRate": 0.13502202643171807,
+          "meanProfit": 1092049,
+          "firstCredit": 0.814
+        }
+      ]
+    },
+    {
+      "n": 30,
+      "rooms": 1000,
+      "seed": 814903,
+      "composition": [
+        0.15,
+        0.7,
+        0.15
+      ],
+      "lossRate": 0.3004,
+      "allLossRate": 0,
+      "models": [
+        {
+          "model": "free",
+          "count": 4530,
+          "lossRate": 0.13245033112582782,
+          "meanProfit": 613001,
+          "firstCredit": 0.107
+        },
+        {
+          "model": "freemium",
+          "count": 20930,
+          "lossRate": 0.3295747730530339,
+          "meanProfit": 345636,
+          "firstCredit": 0.6270000000000001
+        },
+        {
+          "model": "paid",
+          "count": 4540,
+          "lossRate": 0.33348017621145376,
+          "meanProfit": 350364,
+          "firstCredit": 0.266
+        }
+      ]
+    },
+    {
+      "n": 30,
+      "rooms": 1000,
+      "seed": 814903,
+      "composition": [
+        0.15,
+        0.15,
+        0.7
+      ],
+      "lossRate": 0.31793333333333335,
+      "allLossRate": 0,
+      "models": [
+        {
+          "model": "free",
+          "count": 4530,
+          "lossRate": 0.03487858719646799,
+          "meanProfit": 1530052,
+          "firstCredit": 0.718
+        },
+        {
+          "model": "freemium",
+          "count": 4493,
+          "lossRate": 0.26396616959715113,
+          "meanProfit": 797592,
+          "firstCredit": 0.272
+        },
+        {
+          "model": "paid",
+          "count": 20977,
+          "lossRate": 0.3906182962292034,
+          "meanProfit": 143039,
+          "firstCredit": 0.01
+        }
+      ]
+    },
+    {
+      "n": 30,
+      "rooms": 1000,
+      "seed": 814903,
+      "composition": [
+        1,
+        0,
+        0
+      ],
+      "lossRate": 0.17086666666666667,
+      "allLossRate": 0,
+      "models": [
+        {
+          "model": "free",
+          "count": 30000,
+          "lossRate": 0.17086666666666667,
+          "meanProfit": 293917,
+          "firstCredit": 1.0000000000000013
+        },
+        {
+          "model": "freemium",
+          "count": 0,
+          "lossRate": null,
+          "meanProfit": null,
+          "firstCredit": 0
+        },
+        {
+          "model": "paid",
+          "count": 0,
+          "lossRate": null,
+          "meanProfit": null,
+          "firstCredit": 0
+        }
+      ]
+    },
+    {
+      "n": 30,
+      "rooms": 1000,
+      "seed": 814903,
+      "composition": [
+        0,
+        1,
+        0
+      ],
+      "lossRate": 0.33803333333333335,
+      "allLossRate": 0,
+      "models": [
+        {
+          "model": "free",
+          "count": 0,
+          "lossRate": null,
+          "meanProfit": null,
+          "firstCredit": 0
+        },
+        {
+          "model": "freemium",
+          "count": 30000,
+          "lossRate": 0.33803333333333335,
+          "meanProfit": 355973,
+          "firstCredit": 1.0000000000000004
+        },
+        {
+          "model": "paid",
+          "count": 0,
+          "lossRate": null,
+          "meanProfit": null,
+          "firstCredit": 0
+        }
+      ]
+    },
+    {
+      "n": 30,
+      "rooms": 1000,
+      "seed": 814903,
+      "composition": [
+        0,
+        0,
+        1
+      ],
+      "lossRate": 0.19513333333333333,
+      "allLossRate": 0,
+      "models": [
+        {
+          "model": "free",
+          "count": 0,
+          "lossRate": null,
+          "meanProfit": null,
+          "firstCredit": 0
+        },
+        {
+          "model": "freemium",
+          "count": 0,
+          "lossRate": null,
+          "meanProfit": null,
+          "firstCredit": 0
+        },
+        {
+          "model": "paid",
+          "count": 30000,
+          "lossRate": 0.19513333333333333,
+          "meanProfit": 448709,
+          "firstCredit": 1
+        }
+      ]
+    }
+  ]
+}

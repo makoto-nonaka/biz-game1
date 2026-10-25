@@ -1,0 +1,270 @@
+[
+  {
+    "n": 2,
+    "scenarios": 500,
+    "models": {
+      "free": 0,
+      "freemium": 141,
+      "paid": 359
+    },
+    "prices": {
+      "300": 41,
+      "500": 113,
+      "700": 346
+    },
+    "development": {
+      "0": 423,
+      "500000": 77
+    },
+    "advertising": {
+      "0": 480,
+      "500000": 20
+    },
+    "allocations": {
+      "25": 122,
+      "50": 240,
+      "75": 138
+    },
+    "examples": [
+      {
+        "model": "paid",
+        "price": 700,
+        "iosPercent": 50,
+        "development": 500000,
+        "advertising": 0,
+        "profit": 1568474
+      },
+      {
+        "model": "paid",
+        "price": 700,
+        "iosPercent": 75,
+        "development": 0,
+        "advertising": 0,
+        "profit": 3976538
+      },
+      {
+        "model": "freemium",
+        "price": 500,
+        "iosPercent": 50,
+        "development": 0,
+        "advertising": 0,
+        "profit": 1127268
+      },
+      {
+        "model": "freemium",
+        "price": 300,
+        "iosPercent": 50,
+        "development": 0,
+        "advertising": 0,
+        "profit": 675244
+      },
+      {
+        "model": "paid",
+        "price": 700,
+        "iosPercent": 50,
+        "development": 500000,
+        "advertising": 500000,
+        "profit": 2961842
+      },
+      {
+        "model": "paid",
+        "price": 500,
+        "iosPercent": 50,
+        "development": 0,
+        "advertising": 0,
+        "profit": 2074671
+      },
+      {
+        "model": "paid",
+        "price": 500,
+        "iosPercent": 50,
+        "development": 500000,
+        "advertising": 0,
+        "profit": 2125721
+      }
+    ]
+  },
+  {
+    "n": 20,
+    "scenarios": 500,
+    "models": {
+      "free": 85,
+      "freemium": 166,
+      "paid": 249
+    },
+    "prices": {
+      "0": 85,
+      "300": 166,
+      "500": 151,
+      "700": 98
+    },
+    "development": {
+      "500000": 356,
+      "1000000": 144
+    },
+    "advertising": {
+      "500000": 453,
+      "1000000": 47
+    },
+    "allocations": {
+      "25": 148,
+      "50": 105,
+      "75": 223,
+      "100": 24
+    },
+    "examples": [
+      {
+        "model": "freemium",
+        "price": 300,
+        "iosPercent": 25,
+        "development": 500000,
+        "advertising": 500000,
+        "profit": 1932885
+      },
+      {
+        "model": "paid",
+        "price": 700,
+        "iosPercent": 100,
+        "development": 1000000,
+        "advertising": 500000,
+        "profit": 4318727
+      },
+      {
+        "model": "paid",
+        "price": 500,
+        "iosPercent": 75,
+        "development": 500000,
+        "advertising": 500000,
+        "profit": 2040890
+      },
+      {
+        "model": "free",
+        "price": 0,
+        "iosPercent": 25,
+        "development": 500000,
+        "advertising": 500000,
+        "profit": 4640047
+      },
+      {
+        "model": "paid",
+        "price": 700,
+        "iosPercent": 75,
+        "development": 1000000,
+        "advertising": 1000000,
+        "profit": 4437937
+      },
+      {
+        "model": "paid",
+        "price": 500,
+        "iosPercent": 75,
+        "development": 1000000,
+        "advertising": 500000,
+        "profit": 2106348
+      }
+    ]
+  },
+  {
+    "n": 30,
+    "scenarios": 500,
+    "models": {
+      "free": 96,
+      "freemium": 132,
+      "paid": 272
+    },
+    "prices": {
+      "0": 96,
+      "300": 132,
+      "500": 191,
+      "700": 81
+    },
+    "development": {
+      "500000": 295,
+      "1000000": 205
+    },
+    "advertising": {
+      "500000": 375,
+      "1000000": 125
+    },
+    "allocations": {
+      "0": 2,
+      "25": 147,
+      "50": 81,
+      "75": 243,
+      "100": 27
+    },
+    "examples": [
+      {
+        "model": "freemium",
+        "price": 300,
+        "iosPercent": 50,
+        "development": 500000,
+        "advertising": 500000,
+        "profit": 1167167
+      },
+      {
+        "model": "paid",
+        "price": 700,
+        "iosPercent": 75,
+        "development": 1000000,
+        "advertising": 1000000,
+        "profit": 3490575
+      },
+      {
+        "model": "paid",
+        "price": 500,
+        "iosPercent": 75,
+        "development": 1000000,
+        "advertising": 500000,
+        "profit": 1889733
+      },
+      {
+        "model": "paid",
+        "price": 500,
+        "iosPercent": 100,
+        "development": 500000,
+        "advertising": 500000,
+        "profit": 1389978
+      },
+      {
+        "model": "free",
+        "price": 0,
+        "iosPercent": 25,
+        "development": 500000,
+        "advertising": 500000,
+        "profit": 2511757
+      },
+      {
+        "model": "free",
+        "price": 0,
+        "iosPercent": 25,
+        "development": 500000,
+        "advertising": 1000000,
+        "profit": 4413872
+      },
+      {
+        "model": "paid",
+        "price": 500,
+        "iosPercent": 75,
+        "development": 1000000,
+        "advertising": 1000000,
+        "profit": 3290971
+      },
+      {
+        "model": "paid",
+        "price": 700,
+        "iosPercent": 100,
+        "development": 1000000,
+        "advertising": 500000,
+        "profit": 2816732
+      },
+      {
+        "model": "freemium",
+        "price": 300,
+        "iosPercent": 75,
+        "development": 1000000,
+        "advertising": 1000000,
+        "profit": 4531058
+      }
+    ]
+  }
+]

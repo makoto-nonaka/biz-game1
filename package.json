@@ -1,0 +1,18 @@
+{
+  "name": "startup-classroom",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "description": "高校生向け・3ラウンドのアプリ経営ゲーム",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test",
+    "build": "node scripts/build.mjs",
+    "simulate:balance": "node balance/simulate.js",
+    "simulate:resources": "node balance/resources-simulate.js"
+  }
+}

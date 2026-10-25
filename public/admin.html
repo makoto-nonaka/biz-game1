@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#19594b">
+  <meta name="description" content="3回の意思決定で経営を体験する、高校生向けのアプリ開発ビジネスゲーム。">
+  <title>Startup Lab | きみの選択が、会社をつくる。</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/config.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body data-entry="teacher">
+  <header class="site-header"><a class="brand" href="/admin.html?new=1"><span class="brand-icon">▥</span> Startup Lab<span class="brand-tag">CLASSROOM EDITION</span></a><a href="#rules" class="text-link">ゲームのルール ↗</a></header>
+  <main id="app"><p class="loading">準備しています…</p></main>
+  <div id="notice" role="status" aria-live="polite"></div>
+  <section id="rules" class="rules-section">
+    <details><summary>ルールと計算モデルを読む <span>自分の数字を、説明できるようになろう。</span></summary>
+      <div class="rules-body">
+        <p>1人1社、全3回の累計利益を競います。新規ゲームの参加コードは3桁です。市場配分・Free／Freemium／Paid・価格・開発・広告を選び、毎回自由に変更できます。1回は仮想的な半年です。開発投資は次回以降に市場別の経営資源として蓄積します。広告の効果はその回のみです。投資額は当回に全額を費用計上。資金制約・税金・倒産は扱いません。</p>
+        <h3>01 / 市場と3種類の顧客</h3><p>総利用者数は参加社数 × 6,000人、AndroidとiOSに半分ずつ。Androidは低価格重視50%・バランス重視35%・品質重視15%、iOSは25%・35%・40%です。これらは授業用の仮定で、実際の市場の断定ではありません。</p>
+        <p>スライダーは労力の配分です。各市場での競争力は「配分率の0.7乗」で増えるため、集中を増やす追加効果は小さくなります。配分50%は単独市場に全投入する場合の約61.6%の到達力です。0%の市場には参入しません。実際の獲得人数の比率は他社の行動でも変わります。</p>
+        <h3>02 / 稼ぎ方と受取収入</h3><p>Free：売上 ＝ 利用者数 × 広告収入400円<br>Freemium：売上 ＝ 利用者数 × (課金率40% × 課金価格 ＋ 無料利用者60% × 広告収入400円)<br>Paid：売上 ＝ 利用者数 × 販売価格<br>販売・課金価格は300／500／700円。Freeは無料です。Freemiumの課金者には広告を表示しない仮定で、課金率は期待値として計算します。受取広告収入と、自社が払う広告投資は別です。</p>
+        <h3>03 / 追加投資の効果</h3><p>投資0／50／100万円に対し、効果計算用の水準Lは0／1／1.35です。追加50万円による改善は、最初の50万円による改善の35%です。開発係数βは低価格重視0.25・バランス重視0.65・品質重視1.2。広告係数は0.5です。</p>
+        <p>魅力度 ＝ 配分率<sup>0.7</sup> × モデル係数 × 価格係数 × (1 ＋ β × 有効開発水準) × (1 ＋ 0.5 × 広告水準L)</p>
+        <div class="table-scroll"><table><thead><tr><th>顧客タイプ</th><th>Free</th><th>Freemium</th><th>Paid</th></tr></thead><tbody><tr><th>低価格重視</th><td>3</td><td>1.2</td><td>0.3</td></tr><tr><th>バランス重視</th><td>0.85</td><td>2</td><td>1</td></tr><tr><th>品質重視</th><td>0.3</td><td>1</td><td>2.4</td></tr></tbody></table></div>
+        <p>上表はモデル係数。下表はPaidとFreemiumの価格係数で、Freeは常に1です。</p>
+        <div class="table-scroll"><table><thead><tr><th>顧客タイプ</th><th>300円</th><th>500円</th><th>700円</th></tr></thead><tbody><tr><th>低価格重視</th><td>1.8</td><td>0.7</td><td>0.12</td></tr><tr><th>バランス重視</th><td>1.25</td><td>1</td><td>0.4</td></tr><tr><th>品質重視</th><td>1.05</td><td>1</td><td>0.7</td></tr></tbody></table></div>
+        <p>OS×顧客タイプの6組ごとに、各社の魅力度に比例して人数を配分し合計します。整数に切り捨てた余りは小数部分の大きい会社から配り、同率は登録順。誰も参入しない市場の人数は未獲得です。乱数は配分計算に使いません。</p>
+        <h3>04 / 開発資源・生産性・移行費用（教員向け）</h3><p>Android・iOSごとに、当回の開発投資を配分率に応じて資源として蓄積します。ラウンド末資源 ＝ 以前の資源 × 0.8 ＋ 当回開発投資 × 市場への配分率。現金や会計上の資産ではなく、開発知識・ノウハウの内部指標です。広告は蓄積しません。</p><p>次回の学習度k ＝ その市場の蓄積資源 ÷ (50万円 ＋ 蓄積資源)。開発生産性は1＋0.12k、既存品質効果は0.08k。当回の有効開発水準は「投資水準L × 生産性 ＋ 既存品質効果」です。生産性向上率には上限があり、先行投資だけで勝敗が固定しないよう穏やかに設定しています。学生にはこの係数・内部指標を表示しません。</p><p>初回の移行費用は0円。次回以降は前回からiOS配分を100ポイント変えると20万円、50ポイントなら10万円。移行費用は固定費に加えます。資源は投資した市場に残り、新しい市場へ全額移りません。AndroidからiOSに移るとiOSでの蓄積は小さく、再度Androidへ戻れば残存資源を活用できます。</p><h3>05 / 利益と損益分岐点</h3><p>固定費 ＝ 基本運営費50万円 ＋ 開発投資 ＋ 広告投資 ＋ 市場移行費用<br>変動費 ＝ 100円 × 利用者数<br>利益 ＝ 売上 − 固定費 − 変動費<br>損益分岐点人数 ＝ 固定費 ÷ (1人あたり売上 − 100円) の切り上げ</p>
+        <p>例：6,000人、開発・広告各50万円なら費用210万円。Freeの利益は30万円、Freemium500円は54万円、Paid500円は90万円です。これは同じ人数とした比較で、実際の人数は競合と選択によって変わります。</p>
+        <p class="muted">Digital Start-Up Handbookと2026日本語版簡易ガイドを教育設計の参考とした独自モデルです。企業価値・採用・無形資産は扱いません。旧版の保存ゲームは旧ルールを維持します。</p>
+      </div>
+    </details>
+  </section>
+  <footer>STARTUP LAB <span>選ぶ → 試す → 数字で振り返る → 次の一手へ</span><small>授業用プロトタイプ v0.4</small></footer>
+</body>
+</html>

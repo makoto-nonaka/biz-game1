@@ -1,0 +1,20 @@
+# Render単体で画面とAPIを配信。ディスク維持のため有料プランを明示。
+services:
+  - type: web
+    name: startup-classroom
+    runtime: node
+    plan: starter
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: DATA_DIR
+        value: /var/data/startup-lab
+      - key: ALLOWED_ORIGINS
+        value: ""
+    disk:
+      name: classroom-data
+      mountPath: /var/data
+      sizeGB: 1
