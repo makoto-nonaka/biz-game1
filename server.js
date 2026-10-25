@@ -17,7 +17,7 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
   const origins = allowedOrigins.split(',').map(s => s.trim()).filter(Boolean);
   const files = { '/': ['index.html', 'text/html'], '/teacher': ['admin.html', 'text/html'], '/admin.html': ['admin.html','text/html'], '/index.html': ['index.html','text/html'], '/student.html': ['student.html','text/html'],
     '/play': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'],
-    '/style.css': ['style.css', 'text/css'], '/config.js': ['config.js', 'text/javascript'],
+    '/rankings.js': ['rankings.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'], '/config.js': ['config.js', 'text/javascript'],
     '/favicon.svg': ['favicon.svg', 'image/svg+xml'] };
 
   function view(g, role, companyId) {
@@ -29,7 +29,7 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
       if(r.companyId!==companyId){
         // 他社は市場に表れた結果だけを返す。新規内部フィールドも漏れないよう許可リスト方式。
         return {companyId:r.companyId,name:r.name,businessModel:r.businessModel||'paid',price:r.price,
-          customers:r.customers,markets:marketCounts(r)};
+          customers:r.customers,revenue:r.revenue,markets:marketCounts(r)};
       }
       const {resourcesBefore,resourcesAfter,...visible}=r;
       visible.markets=marketCounts(r);
@@ -130,13 +130,13 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
         const game = state.games[code];
         if (b.round !== game.round) fail(409, 'ラウンドが変わりました。画面を更新してください。');
         if (action === 'decision') {
-          if (role !== 'student') fail(403, '学生のみ確定できます。');
+          if (role !== 'student') fail(403, 'プレイヤーのみ確定できます。');
           if (game.phase !== 'deciding') fail(409, 'このラウンドの受付は終了しました。');
           if (game.decisions[company.id]) fail(409, 'すでに確定済みです。');
           if (!validDecision(b)) fail(400, '選択肢の値が不正です。');
           game.decisions[company.id] = normalizeDecision(b);
         } else {
-          if (role !== 'teacher') fail(403, '教員のみ操作できます。');
+          if (role !== 'teacher') fail(403, '運営管理者のみ操作できます。');
           if (action === 'settle') {
             if (game.phase !== 'deciding') fail(409, 'すでに集計済みです。');
             if (!game.companies.length || game.companies.some(c => !game.decisions[c.id])) fail(409, '全社の意思決定が揃ってから集計してください。');
@@ -164,6 +164,6 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT || 3000);
   const server = createApp();
-  server.listen(port, process.env.HOST || '0.0.0.0', () => console.log(`Startup Lab: http://localhost:${port}`));
+  server.listen(port, process.env.HOST || '0.0.0.0', () => console.log(`SmartApps Biz Game: http://localhost:${port}`));
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.close(() => process.exit(0)));
 }

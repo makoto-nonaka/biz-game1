@@ -200,14 +200,15 @@ test('他社の経営情報はAPIでも非開示、自社と教員は詳細を�
  await call(path+'/decision',{round:1,iosPercent:25,businessModel:'paid',price:500,development:1000000,advertising:500000},a.token);
  await call(path+'/decision',{round:1,iosPercent:70,businessModel:'freemium',price:700,development:0,advertising:1000000},b.token);
  const admin=await call(path+'/settle',{round:1},teacher.token);
- const expectedKeys=['businessModel','companyId','customers','markets','name','price'].sort();
+ const expectedKeys=['businessModel','companyId','customers','markets','name','price','revenue'].sort();
  for(const [student,other]of [[a,b],[b,a]]){
   const view=await call(path,undefined,student.token),rows=view.history[0].results;
   const own=rows.find(r=>r.companyId===student.companyId),rival=rows.find(r=>r.companyId===other.companyId);
   assert.deepEqual(Object.keys(rival).sort(),expectedKeys);
   for(const m of ['android','ios'])assert.deepEqual(Object.keys(rival.markets[m]),['customers']);
   assert.equal(rival.customers,rival.markets.android.customers+rival.markets.ios.customers);
-  for(const k of ['iosPercent','development','advertising','switchingCost','fixedCost','variableCost','cost','profit','breakEven','revenue','revenuePerCustomer','adRevenue','paymentRevenue','resourcesBefore','resourcesAfter'])assert.ok(!(k in rival),k);
+  assert.equal(rival.revenue,admin.history[0].results.find(r=>r.companyId===other.companyId).revenue);
+  for(const k of ['iosPercent','development','advertising','switchingCost','fixedCost','variableCost','cost','profit','breakEven','revenuePerCustomer','adRevenue','paymentRevenue','resourcesBefore','resourcesAfter'])assert.ok(!(k in rival),k);
   for(const k of ['iosPercent','development','advertising','switchingCost','fixedCost','variableCost','cost','profit','breakEven','revenue'])assert.ok(k in own,k);
   assert.ok(!('resourcesBefore' in own));assert.ok(!('segments' in own.markets.android));
   assert.equal(view.ranking.length,2);assert.ok(view.ranking.every(r=>'profit' in r));
