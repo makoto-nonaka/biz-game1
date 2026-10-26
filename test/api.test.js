@@ -66,8 +66,8 @@ test('30社・3ラウンドの授業、権限・二重送信・永続化', async
     assert.deepEqual(double.map(r=>r.status).sort(),[200,409]);
     const result = double.find(r=>r.status===200).body;
     assert.equal(result.history.length,round);
-    assert.equal(result.rules.version,4);
-    assert.equal(result.history.at(-1).modelVersion,4);
+    assert.equal(result.rules.version,5);
+    assert.equal(result.history.at(-1).modelVersion,5);
     if(round>1)assert.deepEqual(result.history.at(-1).results[0].resourcesBefore,result.history.at(-2).results[0].resourcesAfter);
     assert.equal(result.history.at(-1).results.length,30);
     assert.equal(result.history.at(-1).results.reduce((s,r)=>s+r.customers,0),180000);
@@ -85,7 +85,7 @@ test('30社・3ラウンドの授業、権限・二重送信・永続化', async
     assert.ok(result.history.at(-1).results.every(r=>'resourcesAfter' in r));
     assert.equal(result.companies.filter(c=>c.submitted).length,30);
     assert.equal(mine.customers,mine.markets.android.customers+mine.markets.ios.customers);
-    assert.equal(mine.revenue,mine.customers*(businessModel==='free'?400:businessModel==='freemium'?440:500));
+    assert.equal(mine.revenue,mine.customers*(businessModel==='free'?300:businessModel==='freemium'?360:500));
     assert.equal((await request(path+'/decision', {token:players[1].token,data})).status,409);
     assert.equal((await request(path+'/join',{data:{name:'途中参加'}})).status,409);
     if(round<3) {
@@ -217,4 +217,17 @@ test('他社の経営情報はAPIでも非開示、自社と教員は詳細を�
  // レスポンス整形が保存データを削っていないことも確認。
  const again=await call(path,undefined,teacher.token);
  assert.deepEqual(again.history,admin.history);
+});
+
+test('保存済みv0.4は再起動後も40%・400円・基本費50万円を維持',async t=>{
+ const dir=mkdtempSync(join(tmpdir(),'startup-v4-compat-'));
+ let server=createApp({dataDir:dir});await new Promise(r=>server.listen(0,'127.0.0.1',r));let base=`http://127.0.0.1:${server.address().port}`;
+ const call=async(path,data,token)=>{const r=await fetch(base+path,{method:data?'POST':'GET',headers:{...(data?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`}:{})},...(data?{body:JSON.stringify(data)}:{})});assert.ok(r.ok);return r.json();};
+ const teacher=await call('/api/games',{title:'旧版維持'}),path=`/api/games/${teacher.code}`;const player=await call(path+'/join',{name:'旧版会社'});
+ await new Promise(r=>server.close(r));
+ const filename=join(dir,'games.json'),saved=JSON.parse(readFileSync(filename,'utf8'));saved.games[teacher.code].modelVersion=4;writeFileSync(filename,JSON.stringify(saved));
+ server=createApp({dataDir:dir});await new Promise(r=>server.listen(0,'127.0.0.1',r));base=`http://127.0.0.1:${server.address().port}`;
+ t.after(async()=>{await new Promise(r=>server.close(r));rmSync(dir,{recursive:true,force:true});});
+ const d={round:1,iosPercent:50,businessModel:'freemium',price:500,development:500000,advertising:500000};await call(path+'/decision',d,player.token);
+ const result=await call(path+'/settle',{round:1},teacher.token);assert.equal(result.rules.version,4);assert.equal(result.rules.freeRevenue,400);assert.equal(result.rules.conversionRate,.4);assert.equal(result.history[0].results[0].revenue,2640000);assert.equal(result.history[0].results[0].fixedCost,1500000);
 });

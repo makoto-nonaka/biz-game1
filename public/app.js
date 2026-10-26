@@ -27,6 +27,7 @@ const adIncome = r => r.adRevenue ?? (r.businessModel==='free'?r.revenue:0);
 const payIncome = r => r.paymentRevenue ?? r.revenue-adIncome(r);
 const priceHelp = () => draft.businessModel==='free'?`Freeは利用者無料。広告収入は1人あたり${money(activeRules().freeRevenue)}です。`:draft.businessModel==='freemium'?`${Math.round(activeRules().conversionRate*100)}%が課金。${activeRules().version>=3?`無料の${Math.round((1-activeRules().conversionRate)*100)}%は広告収入を生みます。`:'旧版ルールでは課金収入だけを計算します。'}`:'アプリの販売価格。購入者全員が支払います。';
 let session = null, game = null, busy = false, requestVersion = 0, lastView = '', draftKey = '', draft = {}, acknowledged = false;
+let draftDirty=false,draftTimer=null,draftSaving=null;
 let rankingMode='profit', rankingMarket='total', rankingRound='latest';
 const pagePath = location.pathname.replace(/\/+$/, '') || '/';
 const teacherEntry=document.body.dataset.entry==='teacher';
@@ -71,27 +72,34 @@ function renderHome() {
     return;
   }
   if(teacherEntry){
-    app.innerHTML=`<div class="landing"><section class="hero"><p class="eyebrow">ADMIN ENTRANCE</p><h1>教室が、<br><span>ひとつの市場に。</span></h1><p class="hero-copy">ゲームを作成し、3桁の参加コードを伝えてください。<br>各社の確定状況を確認しながら、設定した1〜4ラウンドを進めます。</p><p class="muted">プレイヤーには、このサーバーの入口URLを案内してください。</p><a class="secondary" href="/">プレイヤー用入口を開く →</a></section><section class="entry-stack"><article class="card teacher-entry"><div class="section-label">FOR ADMINS <span>ゲーム運営管理者用入口</span></div><h2>ゲームを作成</h2><form id="create-form"><label for="title">ゲーム名</label><input id="title" name="title" maxlength="40" value="はじめてのアプリ経営" required><label for="round-count">ラウンド回数</label><select id="round-count" name="rounds"><option value="1" >1ラウンド</option><option value="2" >2ラウンド</option><option value="3" selected>3ラウンド</option><option value="4" >4ラウンド</option></select><p class="field-help">作成後は変更できません。標準は3ラウンドです。</p><button class="primary full" type="submit">ゲームを作成する ＋</button></form>${localStorage.getItem('teacher')?'<a class="resume" href="/admin.html">作成済みのゲームに戻る →</a>':''}</article></section></div>`;
+    app.innerHTML=`<div class="landing"><section class="hero"><p class="eyebrow">ADMIN ENTRANCE</p><h1>教室が、<br><span>ひとつの市場に。</span></h1><p class="hero-copy">ゲームを作成し、3桁の参加コードを伝えてください。<br>各社の確定状況を確認しながら、設定した1〜4ラウンドを進めます。</p><p class="muted">プレイヤーには、このサーバーの入口URLを案内してください。</p><a class="secondary" href="/">プレイヤー用入口を開く →</a></section><section class="entry-stack"><article class="card teacher-entry"><div class="section-label">FOR ADMINS <span>ゲーム運営管理者用入口</span></div><h2>ゲームを作成</h2><form id="create-form"><label for="title">ゲーム名</label><input id="title" name="title" maxlength="40" value="はじめてのアプリ経営" required><label for="round-count">ラウンド回数</label><select id="round-count" name="rounds"><option value="1" >1ラウンド</option><option value="2" >2ラウンド</option><option value="3" selected>3ラウンド</option><option value="4" >4ラウンド</option></select><label for="team-slots">事前発行するチーム枠数</label><input id="team-slots" name="teamSlots" type="number" min="1" max="30" value="15" required><p class="field-help">最大30チーム。受付中は追加・除外できます。ラウンド数は作成後に変更できません。</p><button class="primary full" type="submit">ゲームを作成する ＋</button></form>${localStorage.getItem('teacher')?'<a class="resume" href="/admin.html">作成済みのゲームに戻る →</a>':''}</article></section></div>`;
     return;
   }
-  app.innerHTML=`<div class="landing"><section class="hero"><p class="eyebrow"><span class="dot"></span> 50分で体験する、はじめての経営</p><h1>きみの選択が、<br><span>会社をつくる。</span></h1><p class="hero-copy">スマホアプリの会社をつくろう。<br>誰に、どんなアプリを届ける？<br>意思決定を重ねて、経営の面白さを見つけよう。</p><div class="hero-meta"><span>1〜4 ラウンド</span><span>20–30 社で競争</span></div><div class="lesson-note"><span class="note-symbol">↗</span><div><strong>経験を重ねて、次の一手へ。</strong><p>選んだ理由と結果を比べ、会社を育てよう。</p></div></div></section><section class="entry-stack"><article class="card join-card"><div class="section-label">FOR PLAYERS <span>プレイヤーの皆さん</span></div><h2>会社をつくって参加する</h2><p class="muted">ゲーム運営管理者から伝えられた参加コードを入力してください。</p><form id="join-form"><label for="code">参加コード</label><input id="code" name="code" inputmode="numeric" autocomplete="off" pattern="[0-9]{3}" maxlength="3" placeholder="3桁の数字" value="${esc(new URLSearchParams(location.search).get('code')||'')}" required><label for="name">会社名</label><input id="name" name="name" autocomplete="organization" maxlength="24" placeholder="例：あしたアプリ" required><button class="primary full" type="submit">この会社で参加する →</button></form><p class="fine-print">本名の入力は不要です</p><a class="resume" href="/singleplay.html">1人でコンピュータと対戦する →</a>${localStorage.getItem('student')?'<a class="resume" href="/play">参加中の会社に戻る →</a>':''}</article></section></div>`;
+  app.innerHTML=`<div class="landing"><section class="hero"><p class="eyebrow"><span class="dot"></span> 50分で体験する、はじめての経営</p><h1>きみの選択が、<br><span>会社をつくる。</span></h1><p class="hero-copy">スマホアプリの会社をつくろう。<br>誰に、どんなアプリを届ける？<br>意思決定を重ねて、経営の面白さを見つけよう。</p><div class="hero-meta"><span>1〜4 ラウンド</span><span>20–30 社で競争</span></div><div class="lesson-note"><span class="note-symbol">↗</span><div><strong>経験を重ねて、次の一手へ。</strong><p>選んだ理由と結果を比べ、会社を育てよう。</p></div></div></section><section class="entry-stack"><article class="card join-card"><div class="section-label">FOR PLAYERS <span>プレイヤーの皆さん</span></div><h2>チームに参加する</h2><p class="muted">ゲーム運営管理者から伝えられた参加コードを入力してください。</p><form id="join-form"><label for="code">参加コード</label><input id="code" name="code" inputmode="numeric" autocomplete="off" pattern="[0-9]{3}" maxlength="3" placeholder="3桁の数字" value="${esc(new URLSearchParams(location.search).get('code')||'')}" required><label for="team-key">チームキー</label><input id="team-key" name="teamKey" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="6桁の英数字"><p class="field-help">大文字・小文字は区別しません。同じチームのメンバーは全員同じキーを使います。</p><details class="legacy-join"><summary>旧形式のゲームに参加する場合</summary><label for="name">会社名</label><input id="name" name="name" maxlength="24" placeholder="旧形式のみ入力"></details><button class="primary full" type="submit">このチームで参加する →</button></form><p class="fine-print">本名の入力は不要です</p><a class="resume" href="/singleplay.html">1人でコンピュータと対戦する →</a>${localStorage.getItem('student')?'<a class="resume" href="/play">参加中の会社に戻る →</a>':''}</article></section></div>`;
 }
 function roundHeader() {
   return `<div class="game-top"><div><p class="eyebrow">${game.role === 'teacher' ? 'ADMIN CONTROL' : 'YOUR COMPANY'} / ${esc(game.title)}</p><h1>${game.role === 'teacher' ? '教室が、ひとつの市場に。' : esc(game.me.name)}</h1></div><button class="quiet" id="leave">入口に戻る</button></div>
-    ${game.rules.version<5?'<p class="legacy-note">このゲームは旧版ルールで進行します。改訂版で遊ぶ場合は入口で新しいゲームを作成してください。</p>':''}<div class="round-strip"><div class="round-steps">${Array.from({length:game.rules.rounds},(_,i)=>i+1).map(n => `<span class="${n === game.round ? 'active' : n < game.round ? 'done' : ''}">${n < game.round ? '✓' : `0${n}`}<small>ラウンド${n}</small></span>`).join('')}</div><span class="phase">${game.phase === 'deciding' ? '意思決定を受付中' : game.phase === 'finished' ? `全${game.rules.rounds}回が終了` : '結果を振り返ろう'}</span></div>`;
+    ${game.rules.version<5?'<p class="legacy-note">このゲームは旧版ルールで進行します。改訂版で遊ぶ場合は入口で新しいゲームを作成してください。</p>':''}<div class="round-strip"><div class="round-steps">${Array.from({length:game.rules.rounds},(_,i)=>i+1).map(n => `<span class="${n === game.round ? 'active' : n < game.round ? 'done' : ''}">${n < game.round ? '✓' : `0${n}`}<small>ラウンド${n}</small></span>`).join('')}</div><span class="phase">${game.phase==='registration'?'チーム参加を受付中':game.phase === 'deciding' ? '意思決定を受付中' : game.phase === 'finished' ? `全${game.rules.rounds}回が終了` : '結果を振り返ろう'}</span></div>`;
 }
 function renderGame() {
   if (!game) return;
   const key = `v${game.rules.version}-${game.code}-${game.me?.id || 'teacher'}-${game.round}`;
   if (key !== draftKey) {
     draftKey = key;
+    draftDirty=false;clearTimeout(draftTimer);
     acknowledged = false;
     const previous = game.history.at(-1)?.results.find(r => r.companyId === game.me?.id);
     let saved;
     try { saved = JSON.parse(sessionStorage.getItem('draft-' + key)); } catch { /* optional */ }
-    draft = saved || (previous ? { iosPercent: iosShare(previous), businessModel: previous.businessModel || 'paid', price: previous.price || 500, development: previous.development, advertising: previous.advertising } : { iosPercent: 50, businessModel: 'paid', price: 500, development: 500000, advertising: 500000 });
+    draft = (!game.teamMode&&saved) || (previous ? { iosPercent: iosShare(previous), businessModel: previous.businessModel || 'paid', price: previous.price || 500, development: previous.development, advertising: previous.advertising } : { iosPercent: 50, businessModel: 'paid', price: 500, development: 500000, advertising: 500000 });
   }
-  app.innerHTML = `<div class="game-page"><p class="balance-version">バランス v0.${game.rules.version} ${game.rules.version>=5?'／ 課金率30％・広告収入300円':'／ 既存ゲームの設定を維持'}</p>${game.mode==='single'?'<p class="solo-badge">コンピュータ対戦 ／ 自分のペースで進められます</p>':''}${roundHeader()}${game.role === 'teacher' ? teacherPanel() : studentPanel()}${game.history.length ? resultPanel() : ''}</div>`;
+  if(game.teamMode&&game.me&&!game.me.canEdit&&!game.me.draft){
+    const previous=game.history.at(-1)?.results.find(r=>r.companyId===game.me.id);
+    draft=previous?{iosPercent:iosShare(previous),businessModel:previous.businessModel||'paid',price:previous.price||500,development:previous.development,advertising:previous.advertising}:{iosPercent:50,businessModel:'paid',price:500,development:500000,advertising:500000};
+  }
+  if(game.teamMode&&game.me?.draft&&(!game.me.canEdit||(!draftDirty&&!draftSaving)))draft={...game.me.draft,price:game.me.draft.price||500};
+  app.innerHTML = `<div class="game-page"><p class="balance-version">バランス v0.${game.rules.version} ${game.rules.version>=5?'／ 課金率30％・広告収入300円':'／ 既存ゲームの設定を維持'}</p>${game.mode==='single'?'<p class="solo-badge">コンピュータ対戦 ／ 自分のペースで進められます</p>':''}${roundHeader()}${game.role === 'teacher' ? (game.phase==='registration'?admissionPanel():teacherPanel()+(game.teamMode?teamTools():'')) : studentPanel()}${game.history.length ? resultPanel() : ''}</div>`;
+  if(game.teamMode&&game.me&&!game.me.canEdit&&game.phase==='deciding'){document.querySelectorAll('#decision-form input,#decision-form button').forEach(el=>el.disabled=true);}
 }
 function exportPanel() {
   return `<section class="card export-card"><div><h2>分析用の記録を保存</h2><p>全ラウンドの選択・結果・解説を保存します。集計前は確定状況も記録します。</p></div><div class="export-actions"><button type="button" class="secondary" data-export="csv">CSVを保存</button><button type="button" class="secondary" data-export="txt">テキストを保存</button></div><p class="fine-print">運営管理者用。他社の投資・費用も含みます。CSVは1社×1ラウンドの形式です。</p></section>`;
@@ -120,9 +128,22 @@ async function downloadRecord(format) {
   }catch(e){announce(e.name==='TimeoutError'?'通信がタイムアウトしました。再度お試しください。':e.message,true);}
   finally{exportBusy=false;document.querySelectorAll('[data-export]').forEach(b=>b.disabled=false);}
 }
+const joinUrl=()=>`${location.origin}/?code=${game.code}`;
+function qrSvg(){if(!window.qrcode)return '';const q=window.qrcode(0,'M');q.addData(joinUrl());q.make();return q.createSvgTag({cellSize:5,margin:20,scalable:true});}
+function teamTools(){
+ return `<section class="card team-tools"><div class="section-heading"><h2>チーム参加情報</h2><button class="secondary" id="team-key-download">チームキーCSVを保存</button></div><div class="join-qr-layout"><div class="join-qr" aria-label="全チーム共通の参加QRコード">${qrSvg()}</div><div><p>全員共通の参加QRコードです。各自のスマホで開き、配布されたチームキーを入力します。</p><a class="join-url" href="${esc(joinUrl())}">${esc(joinUrl())}</a><button class="secondary" id="save-qr">参加QRコードを保存</button><p class="fine-print">チームキーは同じチームのメンバーだけに配布してください。登録端末数は実人数とは一致しない場合があります。</p></div></div><div class="team-slot-grid">${game.teams.map((t,i)=>`<article class="team-slot ${t.excluded?'excluded':''}"><p class="slot-number">参加枠 ${i+1}</p><strong class="team-key">${t.key}</strong><h3>${esc(t.name||'チーム名未登録')}</h3><p>${t.members.length}台が登録 ／ ${t.excluded?'除外':t.active?'参加対象':'未参加'}</p>${game.phase==='registration'?`<button class="secondary" data-exclude="${t.id}" data-state="${!t.excluded}">${t.excluded?'除外を解除':'参加対象から除外'}</button>`:''}${t.name&&t.members.length?`<label>代表者の端末<select data-leader="${t.id}">${t.members.map(m=>`<option value="${m.id}" ${t.leaderId===m.id?'selected':''}>${m.label}${t.leaderId===m.id?'（代表者）':''}</option>`).join('')}</select></label>`:''}</article>`).join('')}</div></section>`;
+}
+function admissionPanel(){
+ const active=game.teams.filter(t=>t.active).length;
+ return `<section class="card admission"><p class="eyebrow">TEAM REGISTRATION</p><h2>チーム参加を受付中</h2><p>チーム名登録済み・除外されていない <strong>${active}チーム</strong> で開始します。未参加・名前未登録・除外した枠は競争や市場規模に含みません。</p><button class="primary" id="start-teams" ${active?'':'disabled'}>受付を終了し、${active}チームで開始する →</button><p class="fine-print">締切後も、参加確定済みチームへのメンバー追加・再接続は可能です。</p><form id="add-teams-form"><label for="add-count">参加枠を追加（現在${game.teams.length}／最大30）</label><input id="add-count" name="count" type="number" min="1" max="${30-game.teams.length}" value="1" ${game.teams.length>=30?'disabled':''}><button class="secondary" type="submit" ${game.teams.length>=30?'disabled':''}>参加枠を追加する</button></form></section>${teamTools()}`;
+}
+async function downloadTeamKeys(){
+ try{const r=await fetch(`${base}/api/games/${session.code}/team-keys`,{headers:{Authorization:`Bearer ${session.token}`}});if(!r.ok)throw new Error('保存できませんでした。');const url=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=url;a.download=`SmartApps_${game.code}_team_keys.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}catch(e){announce(e.message,true);}
+}
+function saveJoinQr(){const url=URL.createObjectURL(new Blob([qrSvg()],{type:'image/svg+xml'})),a=document.createElement('a');a.href=url;a.download=`SmartApps_${game.code}_join.svg`;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
 function teacherPanel() {
   const allReady = game.companies.length > 0 && game.submitted === game.companies.length;
-  return `<div class="dashboard-grid"><section class="card code-card"><p class="eyebrow">JOIN THE MARKET</p><h2>参加コード</h2><div class="join-code">${game.code}</div><p>このコードをプレイヤーに伝えてください。</p><button class="secondary full" id="copy-link">参加リンクをコピー ↗</button><p class="fine-print">参加受付は第1回の集計まで。<br>この端末・ブラウザに運営管理者の操作権限を保存します。</p></section>
+  return `<div class="dashboard-grid"><section class="card code-card"><p class="eyebrow">JOIN THE MARKET</p><h2>参加コード</h2><div class="join-code">${game.code}</div><p>このコードをプレイヤーに伝えてください。</p><button class="secondary full" id="copy-link">参加リンクをコピー ↗</button><p class="fine-print">${game.teamMode?'チーム参加受付は終了しました。参加済みチームへのメンバー追加は可能です。':'参加受付は第1回の集計まで。'}<br>この端末・ブラウザに運営管理者の操作権限を保存します。</p></section>
     <section class="card control-card"><div class="section-label">ROUND ${game.round} <span>運営管理者の進行</span></div><h2>${game.phase === 'deciding' ? 'みんなの意思決定を待っています' : game.phase === 'finished' ? '経営の体験を、学びに変えよう' : '結果を共有して、次の一手へ'}</h2>
     <div class="submission-count"><strong>${game.submitted}</strong><span>/ ${game.companies.length} 社が確定</span></div>
     ${game.phase === 'deciding' ? `<p class="muted">${allReady ? '全社が揃いました。参加人数を確認して集計してください。' : '全社の確定が揃うと、集計できます。画面は自動更新されます。'}</p><button class="primary full" id="settle" ${!allReady ? 'disabled' : ''}>ラウンド${game.round}を集計する →</button>` : game.phase === 'results' ? `<p class="muted">数字を確認し、工夫したことを共有してから進めましょう。</p><button class="primary full" id="next">ラウンド${game.round + 1}を始める →</button>` : '<p>「何を変えたか」「なぜ結果が変わったか」を、ぜひ言葉にしてみてください。</p>'}
@@ -155,13 +176,16 @@ function updateDraftView() {
   document.querySelector('#preview').innerHTML=preview();
 }
 function studentPanel() {
+  if(game.teamMode&&game.me.excluded)return '<section class="card"><h2>このチームは参加対象外です</h2><p>ゲーム運営管理者に確認してください。</p></section>';
+  if(game.teamMode&&game.phase==='registration')return `<section class="card team-wait"><p class="eyebrow">TEAM RECEPTION</p><h2>${!game.me.registered?'チーム名を決めよう':esc(game.me.name)}</h2><p>${!game.me.registered?'最初にチーム名を登録した端末が代表者になります。':'同じキーで入ったメンバーにも名前が共有されています。運営管理者の受付締切を待っています。'}</p><p class="muted">登録端末 ${game.me.memberCount}台 ／ この端末：${esc(game.me.memberLabel)} ／ ${game.me.canEdit?'この端末は代表者です':!game.me.registered?'チーム名は未登録です':'この端末は閲覧用です'}</p>${game.me.canEdit||!game.me.registered?`<form id="team-name-form"><label for="team-name">チーム名</label><input id="team-name" name="name" maxlength="24" value="${game.me.canEdit?esc(game.me.name):''}" placeholder="例：あしたアプリ" required><button class="primary" type="submit">チーム名を登録する</button></form>`:''}</section>`;
+
   if(game.mode==='single'&&game.phase!=='deciding')return `<section class="card waiting"><span class="check-icon">✓</span><div><p class="eyebrow">${game.phase==='finished'?'MATCH COMPLETE':'ROUND COMPLETE'}</p><h2>${game.phase==='finished'?'対戦が終了しました':'ラウンド'+game.round+'の結果が出ました'}</h2><p>${game.phase==='finished'?`累計利益は${game.ranking.find(r=>r.companyId===game.me.id)?.rank??'—'}位 ／ ${game.companies.length}社。下のグラフと結果を確認できます。`:'結果を確認してから、自分のタイミングで次へ進めます。'}</p>${game.phase==='finished'?'<a class="secondary solo-next" href="/singleplay.html?new=1">新しい対戦を始める →</a>':`<button type="button" class="primary solo-next" id="next">ラウンド${game.round+1}へ進む →</button>`}</div></section>`;
   if (game.phase !== 'deciding') return `<section class="card waiting"><span class="check-icon">✓</span><div><p class="eyebrow">${game.phase === 'finished' ? 'ALL ROUNDS COMPLETE' : 'ROUND COMPLETE'}</p><h2>${game.phase === 'finished' ? `${game.rules.rounds}回の経営、おつかれさまでした。` : '結果を見て、次の戦略を考えよう。'}</h2><p>${game.phase === 'finished' ? `全${game.rules.rounds}ラウンドの結果を確認できます。` : 'ゲーム運営管理者が次のラウンドを始めると、選択画面に自動で切り替わります。'}</p></div></section>`;
   if (game.me.decision) {
     const d = game.me.decision;
     return `<section class="card waiting"><span class="check-icon">✓</span><div><p class="eyebrow">DECISION CONFIRMED</p><h2>意思決定を確定しました</h2><p>${allocationName(d)} / ${modelName(d.businessModel)} / ${d.businessModel === 'free' ? '利用者無料' : money(d.price)} / 開発${money(d.development)} / 広告${money(d.advertising)}</p><p class="muted">${game.submitted} / ${game.companies.length}社が確定。ゲーム運営管理者の集計を待っています。<br>集計前に、なぜこの戦略を選んだか考えてみよう。</p></div></section>`;
   }
-  return `<form id="decision-form" class="decision-grid"><section class="card decision-card"><div class="section-label">YOUR STRATEGY <span>ラウンド${game.round}の意思決定</span></div><h2>どんなアプリ会社にする？</h2><p class="muted">${game.round > 1 ? '前回の選択を表示しています。' : '選ぶ前に「なぜ？」を考えてみよう。'}</p>
+  return `${game.teamMode?`<p class="team-role">${esc(game.me.memberLabel)} ／ ${game.me.canEdit?'代表者の画面：選択内容をメンバーに共有します。':'閲覧用の画面：代表者の選択を自動表示します。変更・確定は代表者が操作します。'} <span id="draft-status" role="status"></span></p>`:''}<form id="decision-form" class="decision-grid"><section class="card decision-card"><div class="section-label">YOUR STRATEGY <span>ラウンド${game.round}の意思決定</span></div><h2>どんなアプリ会社にする？</h2><p class="muted">${game.round > 1 ? '前回の選択を表示しています。' : '選ぶ前に「なぜ？」を考えてみよう。'}</p>
     <fieldset><legend><b>01</b> 市場への力の配分</legend><div class="allocation-heading"><label for="ios-percent">市場配分</label><output id="allocation-value" for="ios-percent">${allocationName(draft)}</output></div><input id="ios-percent" class="market-slider" type="range" name="iosPercent" min="0" max="100" step="1" value="${draft.iosPercent}" aria-valuetext="${allocationName(draft)}"><div class="slider-ends"><span>Androidに集中</span><span>iOSに集中</span></div><p class="field-help">Androidは価格、iOSは開発の影響が大きい市場です。配分は労力の割合で、獲得人数の比率ではありません。${game.rules.version>=4?"市場を大きく変更すると、移行費用がかかります。":"市場ごとの競争で利用者数が変わります。"}</p></fieldset>
     <fieldset><legend><b>02</b> どうやって収益を得る？</legend>${choices('businessModel', [{value:'free',label:'Free',note:'無料・広告収入'},{value:'freemium',label:'Freemium',note:'基本無料・一部課金'},{value:'paid',label:'Paid',note:'有料販売'}])}<p class="field-help">どのモデルも、次のラウンドで自由に変更できます。</p></fieldset>
     <fieldset><legend><b>03</b> 販売・課金価格</legend>${choices('price', [300,500,700].map(n=>({value:n,label:n+'円'})))}<p class="field-help" id="price-help">${priceHelp()}</p></fieldset>
@@ -215,14 +239,14 @@ function resultPanel() {
     </section>`;
 }
 async function refresh(force = false) {
-  if (!session || (busy && !force)) return;
+  if (!session || (busy && !force)||draftSaving) return;
   const version = ++requestVersion;
   try {
     const next = await api(`/api/games/${session.code}`);
     if (version !== requestVersion) return;
     document.body.classList.remove('offline');
     const previousCount=game?.companies.length;
-    const serialized = JSON.stringify(next.role === 'student' && next.phase === 'deciding' && !next.me.decision ? {round:next.round,phase:next.phase,me:next.me,history:next.history} : next);
+    const serialized = JSON.stringify(!next.teamMode && next.role === 'student' && next.phase === 'deciding' && !next.me.decision ? {round:next.round,phase:next.phase,me:next.me,history:next.history} : next);
     if (serialized !== lastView || force) { game = next; lastView = serialized; renderGame(); }
     else {game=next;if(previousCount!==next.companies.length && document.querySelector('#preview'))updateDraftView();}
   } catch (e) {
@@ -234,6 +258,28 @@ async function refresh(force = false) {
       else app.innerHTML = '<section class="card retry"><h1>接続を確認してください</h1><p>参加情報はこの端末に保存されています。</p><button class="primary" id="retry">再接続する</button><button class="quiet" id="leave">入口に戻る</button></section>';
     }
   }
+}
+async function flushDraft(){
+  clearTimeout(draftTimer);
+  if(draftSaving)await draftSaving;
+  if(!draftDirty||!game?.teamMode||!game.me?.canEdit||game.phase!=='deciding')return;
+  draftDirty=false;++requestVersion;
+  const round=game.round,decision={...draft,price:draft.businessModel==='free'?0:draft.price};
+  draftSaving=(async()=>{
+    try{
+      const value=await api(`/api/games/${session.code}/draft`,{round,...decision,revision:game.me.draftRevision});
+      if(game.round===round){game.me.draftRevision=value.me.draftRevision;game.me.draft=value.me.draft;}
+      const status=document.querySelector('#draft-status');if(status)status.textContent='共有済み';
+    }catch(e){draftDirty=true;throw e;}
+  })();
+  try{await draftSaving;}finally{draftSaving=null;}
+  if(draftDirty)await flushDraft();
+}
+function queueDraft(){
+ if(!game?.teamMode||!game.me?.canEdit)return;
+ draftDirty=true;clearTimeout(draftTimer);
+ const status=document.querySelector('#draft-status');if(status)status.textContent='共有中…';
+ draftTimer=setTimeout(()=>flushDraft().catch(e=>announce('共有できませんでした。'+e.message,true)),450);
 }
 async function run(action) {
   if (busy) return;
@@ -254,15 +300,19 @@ app.addEventListener('submit', e => {
     saveSession(value);location.assign('/singleplay.html');
   });
   if (form.id === 'join-form') run(async () => {
-    const value = await api(`/api/games/${data.code}/join`, { name: data.name }, null);
+    let prior;try{prior=JSON.parse(sessionStorage.getItem('student')||localStorage.getItem('student')||'null');}catch{}
+    const value = await api(`/api/games/${data.code}/join`, { name: data.name,teamKey:data.teamKey,resumeToken:prior?.code===data.code?prior.token:undefined }, null);
     saveSession(value); location.assign('/play');
   });
   if (form.id === 'create-form') run(async () => {
-    const value = await api('/api/games', { title: data.title, rounds:Number(data.rounds) }, null);
+    const value = await api('/api/games', { title: data.title, rounds:Number(data.rounds),teamSlots:Number(data.teamSlots) }, null);
     saveSession(value); location.assign('/admin.html');
   });
+  if(form.id==='team-name-form')run(async()=>{await api(`/api/games/${session.code}/name`,{name:data.name});});
+  if(form.id==='add-teams-form')run(async()=>{await api(`/api/games/${session.code}/teams`,{count:Number(data.count)});});
   if (form.id === 'decision-form') run(async () => {
-    await api(`/api/games/${session.code}/decision`, { round: game.round, ...draft, price: draft.businessModel === 'free' ? 0 : draft.price });
+    if(game.teamMode)await flushDraft();
+    await api(`/api/games/${session.code}/decision`, { round: game.round, ...(game.teamMode?{revision:game.me.draftRevision}:{}), ...draft, price: draft.businessModel === 'free' ? 0 : draft.price });
     announce(game.mode==='single'?'コンピュータとの対戦結果を集計しました。':'意思決定を確定しました。');
   });
 });
@@ -272,13 +322,20 @@ function updateSelection(e) {
   draft[e.target.name] = e.target.name === 'businessModel' ? e.target.value : Number(e.target.value);
   sessionStorage.setItem('draft-' + draftKey, JSON.stringify(draft));
   updateDraftView();
+  queueDraft();
 }
 app.addEventListener('input', updateSelection);
 app.addEventListener('change', e => {
+  if(e.target.dataset.leader){run(async()=>{await api(`/api/games/${session.code}/leader`,{companyId:e.target.dataset.leader,memberId:e.target.value});});return;}
   if(e.target.id==='ranking-round'){rankingRound=e.target.value;updateRanking('#ranking-round');return;}
   updateSelection(e);
 });
 app.addEventListener('click', e => {
+  const exclude=e.target.closest('[data-exclude]');
+  if(exclude){run(async()=>{await api(`/api/games/${session.code}/team-status`,{companyId:exclude.dataset.exclude,excluded:exclude.dataset.state==='true'});});return;}
+  if(e.target.closest('#start-teams')){run(async()=>{await api(`/api/games/${session.code}/start`,{});});return;}
+  if(e.target.closest('#team-key-download')){downloadTeamKeys();return;}
+  if(e.target.closest('#save-qr')){saveJoinQr();return;}
   const download=e.target.closest('button[data-export]');
   if(download){downloadRecord(download.dataset.export);return;}
   const ranking=e.target.closest('button[data-ranking]');
