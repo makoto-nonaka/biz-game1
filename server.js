@@ -1,12 +1,15 @@
+import { computerDecisions } from './lib/computers.js';
 import { createServer } from 'node:http';
 import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import { createStore } from './lib/store.js';
+import { analyzeGame, exportCsv, exportText } from './lib/analysis.js';
 import { RULES as V3_RULES, settle as settleV3 } from './lib/model-v3.js';
 import { RULES as OLD_RULES, settle as settleOld } from './lib/model-v2.js';
-import { RULES, validDecision, settle, ranking, normalizeDecision } from './lib/model.js';
+import { RULES as V4_RULES, settle as settleV4 } from './lib/model.js';
+import { RULES, validDecision, settle, ranking, normalizeDecision } from './lib/model-v5.js';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const fail = (status, message) => { throw Object.assign(new Error(message), { status }); };
@@ -16,13 +19,14 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
   const store = createStore(dataDir);
   const origins = allowedOrigins.split(',').map(s => s.trim()).filter(Boolean);
   const files = { '/': ['index.html', 'text/html'], '/teacher': ['admin.html', 'text/html'], '/admin.html': ['admin.html','text/html'], '/index.html': ['index.html','text/html'], '/student.html': ['student.html','text/html'],
-    '/play': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'],
-    '/rankings.js': ['rankings.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'], '/config.js': ['config.js', 'text/javascript'],
+    '/singleplay.html': ['singleplay.html','text/html'], '/play': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'],
+    '/charts.js': ['charts.js', 'text/javascript'], '/rankings.js': ['rankings.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'], '/config.js': ['config.js', 'text/javascript'],
     '/favicon.svg': ['favicon.svg', 'image/svg+xml'] };
 
   function view(g, role, companyId) {
     const mine = g.companies.find(c => c.id === companyId);
-    const rules=g.modelVersion===4?RULES:g.modelVersion===3?V3_RULES:OLD_RULES;
+    const modelRules=g.modelVersion===5?RULES:g.modelVersion===4?V4_RULES:g.modelVersion===3?V3_RULES:OLD_RULES;
+    const rules={...modelRules,rounds:g.totalRounds??modelRules.rounds};
     const studentRules=Object.fromEntries(['version','rounds','customersPerCompany','baseCost','variableCost','freeRevenue','conversionRate','prices','investments','switchingCostPerFullShift'].filter(k=>rules[k]!==undefined).map(k=>[k,rules[k]]));
     const marketCounts=r=>Object.fromEntries(['android','ios'].map(m=>[m,{customers:r.markets?.[m]?.customers??(r.market===m?r.customers:0)}]));
     const history=role==='teacher'?g.history:g.history.map(h=>({...h,results:h.results.map(r=>{
@@ -39,7 +43,7 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
       companies: g.companies.map(c => ({ id: c.id, name: c.name, submitted: !!g.decisions[c.id] })),
       submitted: Object.keys(g.decisions).length,
       me: mine ? { id: mine.id, name: mine.name, decision: g.decisions[mine.id] ? normalizeDecision(g.decisions[mine.id]) : null } : null,
-      history, ranking: ranking(g.companies, g.history), role };
+      history, ranking: ranking(g.companies, g.history), role, ...(g.mode==='single'?{mode:'single'}:{}), ...(role==='teacher'?{analysis:analyzeGame(g)}:{}) };
   }
   async function body(req) {
     let data = '';
@@ -86,21 +90,39 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
         res.writeHead(200, { 'Content-Type': `${mime}; charset=utf-8` });
         res.end(readFileSync(resolve(root, 'public', file))); return;
       }
+      if(url.pathname==='/api/singleplay'&&req.method==='POST'){
+        const b=await body(req),name=textField(b.name,24,'会社名');
+        const count=b.computers===undefined?5:b.computers,rounds=b.rounds===undefined?3:b.rounds;
+        if(!Number.isInteger(count)||count<2||count>14)fail(400,'コンピュータ企業は2〜14社で指定してください。');
+        if(!Number.isInteger(rounds)||rounds<1||rounds>4)fail(400,'ラウンド回数は1〜4の整数で指定してください。');
+        const result=store.transaction(state=>{
+          let code;do{code='s'+randomBytes(12).toString('hex');}while(state.games[code]);
+          const player={id:randomUUID(),name,token:token()};
+          const computers=Array.from({length:count},(_,i)=>({id:randomUUID(),name:`CPU ${String(i+1).padStart(2,'0')}`,token:token(),computer:true,strategy:i}));
+          const g={code,title:'コンピュータ対戦',mode:'single',ownerId:player.id,computerSeed:token(),teacherToken:token(),modelVersion:5,totalRounds:rounds,round:1,phase:'deciding',companies:[player,...computers],decisions:{},history:[],createdAt:new Date().toISOString()};
+          g.decisions=computerDecisions(g.companies,g.history,g.computerSeed);
+          state.games[code]=g;
+          return{code,token:player.token,companyId:player.id,role:'student',mode:'single'};
+        });
+        return send(201,result);
+      }
       if (url.pathname === '/api/games' && req.method === 'POST') {
         const b = await body(req);
-        const title = textField(b.title, 40, '授業名');
+        const title = textField(b.title, 40, 'ゲーム名');
+        const totalRounds=b.rounds===undefined?3:b.rounds;
+        if(!Number.isInteger(totalRounds)||totalRounds<1||totalRounds>4)fail(400,'ラウンド回数は1〜4の整数で指定してください。');
         const created = store.transaction(state => {
           const available = Array.from({length:900},(_,i)=>String(i+100)).filter(code=>!state.games[code]);
           if (!available.length) fail(409, '参加コードがすべて使用中です。別の保存フォルダで新しいゲームを作成してください。');
           const code = available[randomInt(available.length)];
           const teacherToken = token();
-          state.games[code] = { code, title, teacherToken, modelVersion: 4, round: 1, phase: 'deciding',
+          state.games[code] = { code, title, teacherToken, modelVersion: 5, totalRounds, round: 1, phase: 'deciding',
             companies: [], decisions: {}, history: [], createdAt: new Date().toISOString() };
           return { code, token: teacherToken, role: 'teacher' };
         });
         return send(201, created);
       }
-      const match = url.pathname.match(/^\/api\/games\/((?:\d{3}|\d{6}))(?:\/(join|decision|settle|next))?$/);
+      const match = url.pathname.match(/^\/api\/games\/((?:s[a-f0-9]{24}|\d{3}|\d{6}))(?:\/(join|decision|settle|next|export))?$/);
       if (!match) fail(404, '接続先が見つかりません。');
       const [, code, action] = match;
       const g = store.read().games[code];
@@ -110,6 +132,7 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
         const name = textField(b.name, 24, '会社名');
         const joined = store.transaction(state => {
           const game = state.games[code];
+          if(game.mode==='single')fail(403,'このゲームは1人用です。専用入口から開始してください。');
           if (game.round !== 1 || game.phase !== 'deciding') fail(409, '参加受付は終了しました。');
           if (game.companies.length >= RULES.maxCompanies) fail(409, '定員の30社に達しました。');
           if (game.companies.some(c => c.name.normalize('NFKC').toLowerCase() === name.normalize('NFKC').toLowerCase())) fail(409, 'その会社名は登録済みです。別の名前にしてください。');
@@ -123,6 +146,16 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
       const role = auth === g.teacherToken ? 'teacher' : 'student';
       const company = g.companies.find(c => c.token === auth);
       if (role !== 'teacher' && !company) fail(401, '参加情報を確認できません。最初の画面から入り直してください。');
+      if (action === 'export') {
+        if (role !== 'teacher') fail(403, '記録の出力は運営管理者のみ操作できます。');
+        if (req.method !== 'GET') fail(405, 'この操作は利用できません。');
+        const format=url.searchParams.get('format')||'csv';
+        if (!['csv','txt'].includes(format)) fail(400, '出力形式はcsvまたはtxtを指定してください。');
+        const exportedAt=new Date().toISOString();
+        res.writeHead(200, {'Content-Type':format==='csv'?'text/csv; charset=utf-8':'text/plain; charset=utf-8',
+          'Content-Disposition':`attachment; filename="SmartApps_${code}_${exportedAt.slice(0,10)}.${format}"`});
+        res.end(format==='csv'?exportCsv(g,exportedAt):exportText(g,exportedAt));return;
+      }
       if (!action && req.method === 'GET') return send(200, view(g, role, company?.id));
       if (req.method !== 'POST') fail(405, 'この操作は利用できません。');
       const b = await body(req);
@@ -135,18 +168,24 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
           if (game.decisions[company.id]) fail(409, 'すでに確定済みです。');
           if (!validDecision(b)) fail(400, '選択肢の値が不正です。');
           game.decisions[company.id] = normalizeDecision(b);
+          if(game.mode==='single'){
+            if(company.id!==game.ownerId)fail(403,'このゲームは操作できません。');
+            game.history.push({round:game.round,...settle(game.companies,game.decisions,game.history)});
+            game.phase=game.round===(game.totalRounds??3)?'finished':'results';
+          }
         } else {
-          if (role !== 'teacher') fail(403, '運営管理者のみ操作できます。');
+          const singleOwner=game.mode==='single'&&company?.id===game.ownerId;
+          if (role !== 'teacher'&&!(singleOwner&&action==='next')) fail(403, '運営管理者のみ操作できます。');
           if (action === 'settle') {
             if (game.phase !== 'deciding') fail(409, 'すでに集計済みです。');
             if (!game.companies.length || game.companies.some(c => !game.decisions[c.id])) fail(409, '全社の意思決定が揃ってから集計してください。');
-            game.history.push({ round: game.round, ...(game.modelVersion === 4 ? settle : game.modelVersion === 3 ? settleV3 : settleOld)(game.companies, game.decisions, game.history) });
-            game.phase = game.round === RULES.rounds ? 'finished' : 'results';
+            game.history.push({ round: game.round, ...(game.modelVersion === 5 ? settle : game.modelVersion === 4 ? settleV4 : game.modelVersion === 3 ? settleV3 : settleOld)(game.companies, game.decisions, game.history) });
+            game.phase = game.round === (game.totalRounds??RULES.rounds) ? 'finished' : 'results';
           } else if (action === 'next') {
-            if (game.phase !== 'results' || game.round >= RULES.rounds) fail(409, '次のラウンドには進めません。');
+            if (game.phase !== 'results' || game.round >= (game.totalRounds??RULES.rounds)) fail(409, '次のラウンドには進めません。');
             game.round++;
             game.phase = 'deciding';
-            game.decisions = {};
+            game.decisions = game.mode==='single'?computerDecisions(game.companies,game.history,game.computerSeed):{};
           } else fail(404, '操作が見つかりません。');
         }
         return view(game, role, company?.id);
