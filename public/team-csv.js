@@ -20,7 +20,7 @@ export function parseTeamCsv(text){
  for(const [index,row]of rows.slice(1).entries()){
   const raw=(row[codeCol]||'').normalize('NFKC').trim();if(!/^(?:\d{1,3}|\d{6})$/.test(raw))throw Error(`${index+2}行目の参加コードを確認してください。`);
   const c=raw.length<=3?raw.padStart(3,'0'):raw;if(code&&c!==code)throw Error('1つのCSVには1つのゲーム番号だけを含めてください。');code=c;
-  const key=(row[keyCol]||'').normalize('NFKC').trim().toUpperCase();if(!/^[A-Z0-9]{6}$/.test(key))throw Error(`${index+2}行目のチームキーは6桁の英数字にしてください。`);
+  const key=(row[keyCol]||'').normalize('NFKC').trim().toUpperCase();if(!/^[0-9]{6}$/.test(key))throw Error(`${index+2}行目のチームキーは6桁の数字にしてください。`);
   if(keys.has(key))throw Error(`チームキー ${key} が重複しています。`);keys.add(key);
   let name=nameCol>=0?(row[nameCol]||'').trim():'';if(/^'[=+@-]/.test(name))name=name.slice(1);
   if([...name].length>24||/[\u0000-\u001f\u007f]/.test(name))throw Error(`${index+2}行目のチーム名は改行なし・24文字以内にしてください。`);

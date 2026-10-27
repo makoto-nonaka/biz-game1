@@ -12,7 +12,7 @@ function render(){
  const sheets=[];
  for(const {pack,practice,main}of selected){
   const teams=practice.teams.slice(0,count),preUrl=`${location.origin}/?code=${practice.code}`,mainUrl=`${location.origin}/?code=${main.code}`;
-  for(let start=0;start<teams.length;start+=6)sheets.push(`<section class="ticket-page"><div class="sheet-caption">${esc(pack.title)} ／ チームごとに1枚配布</div><div class="ticket-grid">${teams.slice(start,start+6).map((t,i)=>`<article class="ticket"><h2>${esc(pack.title)}</h2><div class="key-row"><span>チーム ${start+i+1}</span><strong>${t.key}</strong></div><p>全員が同じキーを入力（大小文字は区別しません）</p><div class="qr-pair"><div>${qr(preUrl)}<b>① プレ</b><span>参加コード ${practice.code}</span></div><div>${qr(mainUrl)}<b>② 本番</b><span>参加コード ${main.code}</span></div></div><p class="instructions">最初に左のQRで参加。案内後に右のQRで本番へ。<br>チーム名を登録した端末が代表者になります。</p><div class="company-line">チーム名：</div></article>`).join('')}</div></section>`);
+  for(let start=0;start<teams.length;start+=6)sheets.push(`<section class="ticket-page"><div class="sheet-caption">${esc(pack.title)} ／ チームごとに1枚配布</div><div class="ticket-grid">${teams.slice(start,start+6).map((t,i)=>`<article class="ticket"><h2>${esc(pack.title)}</h2><div class="key-row"><span>チーム ${start+i+1}</span><strong>${t.key}</strong></div><p>全員が同じチームキーを入力</p><div class="qr-pair"><div>${qr(preUrl)}<b>① プレ</b><span>参加コード ${practice.code}</span></div><div>${qr(mainUrl)}<b>② 本番</b><span>参加コード ${main.code}</span></div></div><p class="instructions">最初に左のQRで参加。案内後に右のQRで本番へ。<br>チーム名を登録した端末が代表者になります。</p><div class="company-line">チーム名：</div></article>`).join('')}</div></section>`);
  }
  pages.innerHTML=sheets.join('');message.textContent=`${selected.length}セッション分、最大${count}チームずつを表示しています。各セッションの予備枠は印刷しなくても残ります。`;
 }

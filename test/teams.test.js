@@ -14,7 +14,7 @@ test('事前発行、複数端末、名前・下書き共有、締切、除外�
  const call=async(path,data,token)=>{const r=await request(path,data,token);assert.ok(r.ok,await r.clone().text());return r.json();};
  for(const teamSlots of [0,31,'15',2.5,null])assert.equal((await request('/api/games',{title:'不正',teamSlots})).status,400);
  const admin=await call('/api/games',{title:'チーム授業',teamSlots:4,rounds:2}),path=`/api/games/${admin.code}`;
- let v=await call(path,undefined,admin.token);assert.equal(v.phase,'registration');assert.equal(v.teams.length,4);assert.equal(new Set(v.teams.map(t=>t.key)).size,4);assert.ok(v.teams.every(t=>/^[A-HJ-NP-Z2-9]{6}$/.test(t.key)));
+ let v=await call(path,undefined,admin.token);assert.equal(v.phase,'registration');assert.equal(v.teams.length,4);assert.equal(new Set(v.teams.map(t=>t.key)).size,4);assert.ok(v.teams.every(t=>/^[1-9][0-9]{5}$/.test(t.key)));
  assert.equal((await request(path+'/start',{},admin.token)).status,409);
  const [a,b,c,unused]=v.teams;
  const x=await call(path+'/join',{teamKey:' '+a.key.toLowerCase()+' '}),y=await call(path+'/join',{teamKey:a.key});

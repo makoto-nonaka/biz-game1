@@ -23,7 +23,7 @@ test('30社・3ラウンドの授業、権限・二重送信・永続化', async
   t.after(async () => { await new Promise(r => server.close(r)); rmSync(dir, { recursive:true, force:true }); });
   assert.equal((await request('/api/health')).status, 200);
   assert.equal((await request('/api/games', {data:{title:''}})).status, 400);
-  const created = await request('/api/games', {data:{title:'動作テスト授業'}});
+  const created = await request('/api/games', {data:{title:'動作テスト授業',rounds:3}});
   assert.equal(created.status, 201);
   const {code, token: teacher} = created.body;
   assert.match(code,/^[1-9][0-9]{2}$/);

@@ -106,7 +106,7 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
           if(!existing.teamMode||existing.teams.length!==parsed.teams.length||existing.teams.some(t=>!parsed.teams.some(p=>p.key===t.key)))fail(409,'既存ゲームのチームキーと一致しません。現在のゲームは変更していません。');
           return send(200,{code:existing.code,token:existing.teacherToken,role:'teacher',restoredExisting:true});
         }
-        const title=textField(b.title||`CSVから復元 ${parsed.code}`,40,'ゲーム名'),rounds=b.rounds??3;
+        const title=textField(b.title||`CSVから復元 ${parsed.code}`,40,'ゲーム名'),rounds=b.rounds??4;
         if(!Number.isInteger(rounds)||rounds<1||rounds>4)fail(400,'ラウンド回数は1〜4を指定してください。');
         const result=store.transaction(state=>{
           const teacherToken=token(),g={code:parsed.code,title,teacherToken,modelVersion:5,totalRounds:rounds,round:1,phase:'registration',runVersion:0,companies:[],decisions:{},history:[],teams:[],drafts:{},teamMode:true,createdAt:new Date().toISOString()};
@@ -142,7 +142,7 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
       if (url.pathname === '/api/games' && req.method === 'POST') {
         const b = await body(req);
         const title = textField(b.title, 40, 'ゲーム名');
-        const totalRounds=b.rounds===undefined?3:b.rounds;
+        const totalRounds=b.rounds===undefined?4:b.rounds;
         if(!Number.isInteger(totalRounds)||totalRounds<1||totalRounds>4)fail(400,'ラウンド回数は1〜4の整数で指定してください。');
         if(b.teamSlots!==undefined&&(!Number.isInteger(b.teamSlots)||b.teamSlots<1||b.teamSlots>30))fail(400,'参加枠は1〜30で指定してください。');
         const created = store.transaction(state => {
