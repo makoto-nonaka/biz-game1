@@ -1,3 +1,4 @@
+import {parseTeamCsv} from './team-csv.js';
 import { breakEvenChart, cumulativeChart } from './charts.js';
 import { roundRanking, modelCompanies } from './rankings.js';
 const app = document.querySelector('#app');
@@ -27,6 +28,7 @@ const adIncome = r => r.adRevenue ?? (r.businessModel==='free'?r.revenue:0);
 const payIncome = r => r.paymentRevenue ?? r.revenue-adIncome(r);
 const priceHelp = () => draft.businessModel==='free'?`Freeは利用者無料。広告収入は1人あたり${money(activeRules().freeRevenue)}です。`:draft.businessModel==='freemium'?`${Math.round(activeRules().conversionRate*100)}%が課金。${activeRules().version>=3?`無料の${Math.round((1-activeRules().conversionRate)*100)}%は広告収入を生みます。`:'旧版ルールでは課金収入だけを計算します。'}`:'アプリの販売価格。購入者全員が支払います。';
 let session = null, game = null, busy = false, requestVersion = 0, lastView = '', draftKey = '', draft = {}, acknowledged = false;
+let importedCsv=null;
 let draftDirty=false,draftTimer=null,draftSaving=null;
 let rankingMode='profit', rankingMarket='total', rankingRound='latest';
 const pagePath = location.pathname.replace(/\/+$/, '') || '/';
@@ -66,6 +68,15 @@ function clearSession() {
   session = null; game = null; lastView = ''; renderHome();
 }
 
+function savedPacks(){try{return JSON.parse(localStorage.getItem('session-packs')||'[]');}catch{return [];}}
+function rememberPacks(packs){const old=savedPacks();for(const p of packs){const i=old.findIndex(x=>x.managementKey===p.managementKey);if(i>=0)old[i]=p;else old.push(p);}localStorage.setItem('session-packs',JSON.stringify(old));}
+function packNavigation(){
+ const packs=savedPacks();if(!packs.length)return '';
+ return `<section class="card pack-navigation"><h2>事前準備したセッション</h2><p class="muted">プレと本番の成績は別々です。同じセッションではチームキーが共通です。</p>${packs.map((p,i)=>`<div class="pack-nav-row"><strong>${esc(p.title)}</strong><div>${p.games.map(g=>`<button class="secondary" type="button" data-pack-game="${g.code}">${esc(g.label)} ／ ${g.code}${session?.code===g.code?'（表示中）':''}</button>`).join('')}</div><details><summary>運営用ゲームキー（運営側だけで保管）</summary><code>${p.managementKey.match(/.{1,4}/g).join('-')}</code></details></div>`).join('')}<div class="export-actions"><a class="secondary" href="/tickets.html" target="_blank" rel="noopener">チーム配布票を印刷</a><a class="secondary" href="/tickets.html?admin=1" target="_blank" rel="noopener">運営用控えを印刷</a></div></section>`;
+}
+function packSetup(){return `<section class="card pack-setup"><h2>2セッション分を事前準備する</h2><p>プレ1回＋本番をセットで作成します。各セッション内では、プレと本番で同じチームキーを使います。</p><form id="pack-create-form"><label for="pack-title">講義名</label><input id="pack-title" name="title" maxlength="20" value="アプリ経営体験" required><label for="pack-slots">各セッションの発行枠数</label><input id="pack-slots" name="teamSlots" type="number" min="1" max="30" value="20" required><p class="field-help">実際は15チームで遊ぶ場合も、予備を含め20枠発行できます。未使用枠は締切時に対象外になります。</p><label for="pack-rounds">本番のラウンド数</label><select id="pack-rounds" name="mainRounds">${[1,2,3,4].map(n=>`<option value="${n}" ${n===3?'selected':''}>${n}回</option>`).join('')}</select><button class="primary full" type="submit">2セッション（計4ゲーム）を作成する</button></form><form id="pack-open-form"><label for="management-key">運営用ゲームキーで再開</label><input id="management-key" name="managementKey" placeholder="XXXX-XXXX-XXXX" autocomplete="off" required><button class="secondary" type="submit">セッションを呼び出す</button></form></section>`;}
+function csvImportPanel(){return `<section class="card csv-import"><h2>チームキーCSVからゲームを読み込む</h2><p>保存したCSVの参加コード・チームキー・チーム名を使います。既存ゲームは進行や参加端末を変更せず開きます。</p><form id="csv-import-form"><label for="team-csv-file">チームキーCSV（UTF-8）</label><input id="team-csv-file" type="file" accept=".csv,text/csv" required><div id="csv-preview" role="status"></div><label for="csv-title">新規復元時のゲーム名</label><input id="csv-title" name="title" maxlength="40" value="CSVから復元したゲーム"><label for="csv-rounds">新規復元時のラウンド数</label><select id="csv-rounds" name="rounds">${[1,2,3,4].map(n=>`<option value="${n}" ${n===3?'selected':''}>${n}回</option>`).join('')}</select><button class="primary" type="submit">CSVの設定で読み込む</button></form><p class="fine-print">CSVには運営権限や成績・端末情報は含まれません。既存番号の上書きはしません。</p></section>`;}
+function resetPanel(){return `<section class="card reset-panel"><h2>1ラウンド目からリセット</h2><p>チーム名・キー・参加端末・代表者は維持します。意思決定・累計利益・開発経験を初期化し、ログアウトせずラウンド1へ戻ります。</p><form id="reset-form"><label for="reset-rounds">リセット後のラウンド数</label><select id="reset-rounds" name="rounds">${[1,2,3,4].map(n=>`<option value="${n}" ${game.rules.rounds===n?'selected':''}>${n}回</option>`).join('')}</select><label class="confirm-label"><input type="checkbox" required><span>現在のプレイを終了し、全チームが選び直すことを確認しました。</span></label><button class="secondary" type="submit" ${game.history.length?'':'disabled'}>1ラウンド目からリセットする</button></form><p class="fine-print">集計後に利用できます。リセット前の成績は別記録として保存します。</p>${game.resetArchives?.length?`<details><summary>リセット前の記録を保存</summary>${game.resetArchives.map(a=>`<div class="archive-row"><span>${esc(new Date(a.at).toLocaleString('ja-JP'))} ／ ${a.rounds}回集計</span><button type="button" class="secondary" data-export="csv" data-archive="${a.index}">CSV</button><button type="button" class="secondary" data-export="txt" data-archive="${a.index}">テキスト</button></div>`).join('')}</details>`:''}</section>`;}
 function renderHome() {
   if(singleEntry){
     app.innerHTML=`<div class="landing"><section class="hero"><p class="eyebrow">SOLO PRACTICE</p><h1>次の一手を、<br><span>自分のペースで。</span></h1><p class="hero-copy">コンピュータ企業を相手に、アプリ経営に挑戦。<br>選択を確定すると、その場で結果が分かります。</p><div class="lesson-note"><span class="note-symbol">↗</span><div><strong>同じ市場、異なる戦略。</strong><p>Free・Freemium・Paidの企業と競争します。相手は前回までの結果を見て選択を調整します。</p></div></div><a class="text-link" href="/">みんなで遊ぶ入口へ →</a></section><section class="entry-stack"><article class="card"><div class="section-label">COMPUTER MATCH <span>1人で遊ぶ</span></div><h2>対戦を準備する</h2><form id="single-form"><label for="solo-name">会社名</label><input id="solo-name" name="name" maxlength="24" placeholder="例：あしたアプリ" required><label for="computer-count">コンピュータ企業の数</label><select id="computer-count" name="computers">${Array.from({length:13},(_,i)=>i+2).map(n=>`<option value="${n}" ${n===5?'selected':''}>${n}社（自社を含めて${n+1}社）</option>`).join('')}</select><label for="round-count">ラウンド回数</label><select id="round-count" name="rounds">${[1,2,3,4].map(n=>`<option value="${n}" ${n===3?'selected':''}>${n}ラウンド</option>`).join('')}</select><button class="primary full" type="submit">コンピュータ対戦を始める →</button></form>${localStorage.getItem('singleplay')?'<a class="resume" href="/singleplay.html">前の対戦を続ける →</a>':''}<p class="fine-print">参加コード・管理者の操作は不要です。対戦状況はこのブラウザから再開できます。</p></article></section></div>`;
@@ -73,6 +84,7 @@ function renderHome() {
   }
   if(teacherEntry){
     app.innerHTML=`<div class="landing"><section class="hero"><p class="eyebrow">ADMIN ENTRANCE</p><h1>教室が、<br><span>ひとつの市場に。</span></h1><p class="hero-copy">ゲームを作成し、3桁の参加コードを伝えてください。<br>各社の確定状況を確認しながら、設定した1〜4ラウンドを進めます。</p><p class="muted">プレイヤーには、このサーバーの入口URLを案内してください。</p><a class="secondary" href="/">プレイヤー用入口を開く →</a></section><section class="entry-stack"><article class="card teacher-entry"><div class="section-label">FOR ADMINS <span>ゲーム運営管理者用入口</span></div><h2>ゲームを作成</h2><form id="create-form"><label for="title">ゲーム名</label><input id="title" name="title" maxlength="40" value="はじめてのアプリ経営" required><label for="round-count">ラウンド回数</label><select id="round-count" name="rounds"><option value="1" >1ラウンド</option><option value="2" >2ラウンド</option><option value="3" selected>3ラウンド</option><option value="4" >4ラウンド</option></select><label for="team-slots">事前発行するチーム枠数</label><input id="team-slots" name="teamSlots" type="number" min="1" max="30" value="15" required><p class="field-help">最大30チーム。受付中は追加・除外できます。ラウンド数は作成後に変更できません。</p><button class="primary full" type="submit">ゲームを作成する ＋</button></form>${localStorage.getItem('teacher')?'<a class="resume" href="/admin.html">作成済みのゲームに戻る →</a>':''}</article></section></div>`;
+    app.innerHTML+=csvImportPanel()+packNavigation()+packSetup();
     return;
   }
   app.innerHTML=`<div class="landing"><section class="hero"><p class="eyebrow"><span class="dot"></span> 50分で体験する、はじめての経営</p><h1>きみの選択が、<br><span>会社をつくる。</span></h1><p class="hero-copy">スマホアプリの会社をつくろう。<br>誰に、どんなアプリを届ける？<br>意思決定を重ねて、経営の面白さを見つけよう。</p><div class="hero-meta"><span>1〜4 ラウンド</span><span>20–30 社で競争</span></div><div class="lesson-note"><span class="note-symbol">↗</span><div><strong>経験を重ねて、次の一手へ。</strong><p>選んだ理由と結果を比べ、会社を育てよう。</p></div></div></section><section class="entry-stack"><article class="card join-card"><div class="section-label">FOR PLAYERS <span>プレイヤーの皆さん</span></div><h2>チームに参加する</h2><p class="muted">ゲーム運営管理者から伝えられた参加コードを入力してください。</p><form id="join-form"><label for="code">参加コード</label><input id="code" name="code" inputmode="numeric" autocomplete="off" pattern="[0-9]{3}" maxlength="3" placeholder="3桁の数字" value="${esc(new URLSearchParams(location.search).get('code')||'')}" required><label for="team-key">チームキー</label><input id="team-key" name="teamKey" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="6桁の英数字"><p class="field-help">大文字・小文字は区別しません。同じチームのメンバーは全員同じキーを使います。</p><details class="legacy-join"><summary>旧形式のゲームに参加する場合</summary><label for="name">会社名</label><input id="name" name="name" maxlength="24" placeholder="旧形式のみ入力"></details><button class="primary full" type="submit">このチームで参加する →</button></form><p class="fine-print">本名の入力は不要です</p><a class="resume" href="/singleplay.html">1人でコンピュータと対戦する →</a>${localStorage.getItem('student')?'<a class="resume" href="/play">参加中の会社に戻る →</a>':''}</article></section></div>`;
@@ -83,7 +95,7 @@ function roundHeader() {
 }
 function renderGame() {
   if (!game) return;
-  const key = `v${game.rules.version}-${game.code}-${game.me?.id || 'teacher'}-${game.round}`;
+  const key = `v${game.rules.version}-${game.runVersion??0}-${game.code}-${game.me?.id || 'teacher'}-${game.round}`;
   if (key !== draftKey) {
     draftKey = key;
     draftDirty=false;clearTimeout(draftTimer);
@@ -98,7 +110,7 @@ function renderGame() {
     draft=previous?{iosPercent:iosShare(previous),businessModel:previous.businessModel||'paid',price:previous.price||500,development:previous.development,advertising:previous.advertising}:{iosPercent:50,businessModel:'paid',price:500,development:500000,advertising:500000};
   }
   if(game.teamMode&&game.me?.draft&&(!game.me.canEdit||(!draftDirty&&!draftSaving)))draft={...game.me.draft,price:game.me.draft.price||500};
-  app.innerHTML = `<div class="game-page"><p class="balance-version">バランス v0.${game.rules.version} ${game.rules.version>=5?'／ 課金率30％・広告収入300円':'／ 既存ゲームの設定を維持'}</p>${game.mode==='single'?'<p class="solo-badge">コンピュータ対戦 ／ 自分のペースで進められます</p>':''}${roundHeader()}${game.role === 'teacher' ? (game.phase==='registration'?admissionPanel():teacherPanel()+(game.teamMode?teamTools():'')) : studentPanel()}${game.history.length ? resultPanel() : ''}</div>`;
+  app.innerHTML = `<div class="game-page"><p class="balance-version">バランス v0.${game.rules.version} ${game.rules.version>=5?'／ 課金率30％・広告収入300円':'／ 既存ゲームの設定を維持'}</p>${game.mode==='single'?'<p class="solo-badge">コンピュータ対戦 ／ 自分のペースで進められます</p>':''}${teacherEntry?packNavigation():''}${roundHeader()}${game.role === 'teacher' ? (game.phase==='registration'?admissionPanel():teacherPanel()+(game.teamMode?teamTools():'')) : studentPanel()}${game.role==='teacher'&&game.teamMode?csvImportPanel()+resetPanel():''}${game.history.length ? resultPanel() : ''}</div>`;
   if(game.teamMode&&game.me&&!game.me.canEdit&&game.phase==='deciding'){document.querySelectorAll('#decision-form input,#decision-form button').forEach(el=>el.disabled=true);}
 }
 function exportPanel() {
@@ -115,11 +127,11 @@ function analysisChoice(value) {
   return money(value.development??value.advertising);
 }
 let exportBusy=false;
-async function downloadRecord(format) {
+async function downloadRecord(format,archive) {
   if(exportBusy)return;
   exportBusy=true;document.querySelectorAll('[data-export]').forEach(b=>b.disabled=true);
   try {
-    const response=await fetch(`${base}/api/games/${session.code}/export?format=${format}`,{headers:{Authorization:`Bearer ${session.token}`},signal:AbortSignal.timeout(20000)});
+    const response=await fetch(`${base}/api/games/${session.code}/export?format=${format}${archive===undefined?'':'&archive='+archive}`,{headers:{Authorization:`Bearer ${session.token}`},signal:AbortSignal.timeout(20000)});
     if(!response.ok){const value=await response.json();throw new Error(value.error||'記録を保存できませんでした。');}
     const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement('a');
     link.href=url;link.download=`SmartApps_${session.code}_${new Date().toISOString().replace(/[:.]/g,'-')}.${format}`;
@@ -244,6 +256,7 @@ async function refresh(force = false) {
   try {
     const next = await api(`/api/games/${session.code}`);
     if (version !== requestVersion) return;
+    if(game&&next.role==='student'&&(next.runVersion??0)>(game.runVersion??0))announce('ゲームがリセットされました。ラウンド1の選択を最初から行ってください。');
     document.body.classList.remove('offline');
     const previousCount=game?.companies.length;
     const serialized = JSON.stringify(!next.teamMode && next.role === 'student' && next.phase === 'deciding' && !next.me.decision ? {round:next.round,phase:next.phase,me:next.me,history:next.history} : next);
@@ -264,11 +277,11 @@ async function flushDraft(){
   if(draftSaving)await draftSaving;
   if(!draftDirty||!game?.teamMode||!game.me?.canEdit||game.phase!=='deciding')return;
   draftDirty=false;++requestVersion;
-  const round=game.round,decision={...draft,price:draft.businessModel==='free'?0:draft.price};
+  const round=game.round,runVersion=game.runVersion??0,code=session.code,decision={...draft,price:draft.businessModel==='free'?0:draft.price};
   draftSaving=(async()=>{
     try{
-      const value=await api(`/api/games/${session.code}/draft`,{round,...decision,revision:game.me.draftRevision});
-      if(game.round===round){game.me.draftRevision=value.me.draftRevision;game.me.draft=value.me.draft;}
+      const value=await api(`/api/games/${code}/draft`,{round,runVersion,...decision,revision:game.me.draftRevision});
+      if(game.round===round&&game.code===code&&(game.runVersion??0)===runVersion){game.me.draftRevision=value.me.draftRevision;game.me.draft=value.me.draft;}
       const status=document.querySelector('#draft-status');if(status)status.textContent='共有済み';
     }catch(e){draftDirty=true;throw e;}
   })();
@@ -295,6 +308,16 @@ async function run(action) {
 app.addEventListener('submit', e => {
   e.preventDefault();
   const form = e.target, data = Object.fromEntries(new FormData(form));
+  if(form.id==='csv-import-form')run(async()=>{
+    if(!importedCsv)throw new Error('CSVを選び、読み取り結果を確認してください。');
+    let prior;try{prior=JSON.parse(sessionStorage.getItem('teacher')||localStorage.getItem('teacher')||'null');}catch{}
+    const code=parseTeamCsv(importedCsv).code,auth=[session,prior,...savedPacks().flatMap(p=>p.games)].find(s=>s?.role==='teacher'&&s.code===code);
+    const value=await api('/api/games/import',{csv:importedCsv,title:data.title,rounds:Number(data.rounds)},auth||null);
+    saveSession(value);location.assign('/admin.html');
+  });
+  if(form.id==='reset-form')run(async()=>{await api(`/api/games/${session.code}/reset`,{runVersion:game.runVersion??0,rounds:Number(data.rounds)});announce('ラウンド1へ戻しました。全チームの画面も自動で更新されます。');});
+  if(form.id==='pack-create-form')run(async()=>{const value=await api('/api/session-packs',{title:data.title,teamSlots:Number(data.teamSlots),mainRounds:Number(data.mainRounds),sessionCount:2},null);rememberPacks(value.packs);saveSession(value.packs[0].games[0]);location.assign('/admin.html');});
+  if(form.id==='pack-open-form')run(async()=>{const value=await api('/api/session-packs/open',{managementKey:data.managementKey},null);rememberPacks([value]);saveSession(value.games[0]);location.assign('/admin.html');});
   if(form.id==='single-form')run(async()=>{
     const value=await api('/api/singleplay',{name:data.name,computers:Number(data.computers),rounds:Number(data.rounds)},null);
     saveSession(value);location.assign('/singleplay.html');
@@ -312,7 +335,7 @@ app.addEventListener('submit', e => {
   if(form.id==='add-teams-form')run(async()=>{await api(`/api/games/${session.code}/teams`,{count:Number(data.count)});});
   if (form.id === 'decision-form') run(async () => {
     if(game.teamMode)await flushDraft();
-    await api(`/api/games/${session.code}/decision`, { round: game.round, ...(game.teamMode?{revision:game.me.draftRevision}:{}), ...draft, price: draft.businessModel === 'free' ? 0 : draft.price });
+    await api(`/api/games/${session.code}/decision`, { round: game.round, ...(game.teamMode?{revision:game.me.draftRevision,runVersion:game.runVersion??0}:{}), ...draft, price: draft.businessModel === 'free' ? 0 : draft.price });
     announce(game.mode==='single'?'コンピュータとの対戦結果を集計しました。':'意思決定を確定しました。');
   });
 });
@@ -325,19 +348,25 @@ function updateSelection(e) {
   queueDraft();
 }
 app.addEventListener('input', updateSelection);
-app.addEventListener('change', e => {
+app.addEventListener('change', async e => {
+  if(e.target.id==='team-csv-file'){
+    importedCsv=null;const out=document.querySelector('#csv-preview');
+    try{const f=e.target.files[0];if(!f||f.size>50000)throw new Error('50KB以内のCSVを選んでください。');const csv=new TextDecoder('utf-8',{fatal:true}).decode(await f.arrayBuffer());const value=parseTeamCsv(csv);importedCsv=csv;out.textContent=`ゲーム番号 ${value.code} ／ ${value.teams.length}チーム枠 ／ 名前登録済み ${value.teams.filter(t=>t.name).length}枠。`;}catch(error){out.textContent=error.message;}
+    return;
+  }
   if(e.target.dataset.leader){run(async()=>{await api(`/api/games/${session.code}/leader`,{companyId:e.target.dataset.leader,memberId:e.target.value});});return;}
   if(e.target.id==='ranking-round'){rankingRound=e.target.value;updateRanking('#ranking-round');return;}
   updateSelection(e);
 });
 app.addEventListener('click', e => {
+  const switchGame=e.target.closest('[data-pack-game]');if(switchGame){const g=savedPacks().flatMap(p=>p.games).find(g=>g.code===switchGame.dataset.packGame);if(g){saveSession(g);game=null;draftKey='';lastView='';refresh(true);}return;}
   const exclude=e.target.closest('[data-exclude]');
   if(exclude){run(async()=>{await api(`/api/games/${session.code}/team-status`,{companyId:exclude.dataset.exclude,excluded:exclude.dataset.state==='true'});});return;}
   if(e.target.closest('#start-teams')){run(async()=>{await api(`/api/games/${session.code}/start`,{});});return;}
   if(e.target.closest('#team-key-download')){downloadTeamKeys();return;}
   if(e.target.closest('#save-qr')){saveJoinQr();return;}
   const download=e.target.closest('button[data-export]');
-  if(download){downloadRecord(download.dataset.export);return;}
+  if(download){downloadRecord(download.dataset.export,download.dataset.archive);return;}
   const ranking=e.target.closest('button[data-ranking]');
   if(ranking){rankingMode=ranking.dataset.ranking;updateRanking(`[data-ranking="${rankingMode}"]`);return;}
   const market=e.target.closest('button[data-ranking-market]');
@@ -346,7 +375,7 @@ app.addEventListener('click', e => {
   if (id === 'leave') location.assign(singleEntry?'/singleplay.html?new=1':teacherEntry?'/admin.html?new=1':'/');
   if (id === 'retry') refresh(true);
   if (id === 'settle' || id === 'next') run(async () => {
-    await api(`/api/games/${session.code}/${id}`, { round: game.round });
+    await api(`/api/games/${session.code}/${id}`, { round: game.round,runVersion:game.runVersion??0 });
     announce(id === 'settle' ? '全社の結果を集計しました。' : '次のラウンドを開始しました。');
   });
   if (id === 'copy-link') {

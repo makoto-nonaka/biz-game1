@@ -1,3 +1,5 @@
+import {parseTeamCsv} from './public/team-csv.js';
+import {createSessionPacks,normalizeManagementKey} from './lib/session-packs.js';
 import {addTeamSlots,joinTeam,teamForToken,registrationTeams} from './lib/teams.js';
 import { computerDecisions } from './lib/computers.js';
 import { createServer } from 'node:http';
@@ -20,7 +22,7 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
   const store = createStore(dataDir);
   const origins = allowedOrigins.split(',').map(s => s.trim()).filter(Boolean);
   const files = { '/': ['index.html', 'text/html'], '/teacher': ['admin.html', 'text/html'], '/admin.html': ['admin.html','text/html'], '/index.html': ['index.html','text/html'], '/student.html': ['student.html','text/html'],
-    '/singleplay.html': ['singleplay.html','text/html'], '/play': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'],
+    '/team-csv.js':['team-csv.js','text/javascript'], '/tickets.html':['tickets.html','text/html'], '/tickets.js':['tickets.js','text/javascript'], '/tickets.css':['tickets.css','text/css'], '/singleplay.html': ['singleplay.html','text/html'], '/play': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'],
     '/charts.js': ['charts.js', 'text/javascript'], '/rankings.js': ['rankings.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'], '/config.js': ['config.js', 'text/javascript'],
     '/vendor/qrcode.js':['vendor/qrcode.js','text/javascript'], '/favicon.svg': ['favicon.svg', 'image/svg+xml'] };
 
@@ -42,18 +44,19 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
       visible.markets=marketCounts(r);
       return visible;
     })}));
-    return { code: g.code, title: g.title, round: g.round, phase: g.phase, rules: role==='teacher'?rules:studentRules,
+    return { code: g.code, title: g.title, round: g.round, phase: g.phase, runVersion:g.runVersion??0, rules: role==='teacher'?rules:studentRules,
       companies: companies.map(c => ({ id: c.id, name: c.name, submitted: !!g.decisions[c.id] })),
       submitted: Object.keys(g.decisions).length,
       me: mine ? { id: mine.id, name: mine.name||'チーム名を登録してください', ...(team?{registered:!!team.name,canEdit:team.leaderId===memberId,memberId,memberLabel:`端末${team.members.findIndex(m=>m.id===memberId)+1}`,excluded:team.excluded,memberCount:team.members.length,draft:g.drafts?.[mine.id]?.decision??null,draftRevision:g.drafts?.[mine.id]?.revision??0}:{}), decision: g.decisions[mine.id] ? normalizeDecision(g.decisions[mine.id]) : null } : null,
       history, ranking: ranking(companies, g.history), role,
-      ...(g.teamMode?{teamMode:true,...(role==='teacher'?{teams:g.teams.map(t=>({id:t.id,key:t.key,name:t.name,members:t.members.map((m,i)=>({id:m.id,label:`端末${i+1}`})),leaderId:t.leaderId,excluded:t.excluded,active:g.phase==='registration'?!!(t.name&&t.members.length&&!t.excluded):g.companies.some(c=>c.id===t.id)}))}:{})}:{}), ...(g.mode==='single'?{mode:'single'}:{}), ...(role==='teacher'?{analysis:analyzeGame(g)}:{}) };
+      ...(g.packKey&&role==='teacher'?{pack:{stage:g.stage,games:store.read().sessionPacks[g.packKey].games.map(({token,...v})=>v)}}:{}),
+      ...(g.teamMode?{teamMode:true,...(role==='teacher'?{teams:g.teams.map(t=>({id:t.id,key:t.key,name:t.name,members:t.members.map((m,i)=>({id:m.id,label:`端末${i+1}`})),leaderId:t.leaderId,excluded:t.excluded,active:g.phase==='registration'?!!(t.name&&t.members.length&&!t.excluded):g.companies.some(c=>c.id===t.id)}))}:{})}:{}), ...(g.mode==='single'?{mode:'single'}:{}), ...(role==='teacher'?{analysis:analyzeGame(g),resetArchives:(g.resetArchives||[]).map((a,index)=>({index,at:a.at,rounds:a.snapshot.history.length}))}:{}) };
   }
-  async function body(req) {
+  async function body(req,limit=8192) {
     let data = '';
     for await (const chunk of req) {
       data += chunk;
-      if (Buffer.byteLength(data) > 8192) fail(413, '入力が長すぎます。');
+      if (Buffer.byteLength(data) > limit) fail(413, '入力が長すぎます。');
     }
     try {
       const parsed = JSON.parse(data || '{}');
@@ -94,6 +97,32 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
         res.writeHead(200, { 'Content-Type': `${mime}; charset=utf-8` });
         res.end(readFileSync(resolve(root, 'public', file))); return;
       }
+      if(url.pathname==='/api/games/import'&&req.method==='POST'){
+        const b=await body(req,65536);let parsed;
+        try{parsed=parseTeamCsv(b.csv);}catch(e){fail(400,e.message);}
+        const existing=store.read().games[parsed.code];
+        if(existing){
+          if(req.headers.authorization!==`Bearer ${existing.teacherToken}`)fail(409,'このゲーム番号は使用中です。該当ゲームの運営画面から読み込んでください。CSVだけで運営権限を取得することはできません。');
+          if(!existing.teamMode||existing.teams.length!==parsed.teams.length||existing.teams.some(t=>!parsed.teams.some(p=>p.key===t.key)))fail(409,'既存ゲームのチームキーと一致しません。現在のゲームは変更していません。');
+          return send(200,{code:existing.code,token:existing.teacherToken,role:'teacher',restoredExisting:true});
+        }
+        const title=textField(b.title||`CSVから復元 ${parsed.code}`,40,'ゲーム名'),rounds=b.rounds??3;
+        if(!Number.isInteger(rounds)||rounds<1||rounds>4)fail(400,'ラウンド回数は1〜4を指定してください。');
+        const result=store.transaction(state=>{
+          const teacherToken=token(),g={code:parsed.code,title,teacherToken,modelVersion:5,totalRounds:rounds,round:1,phase:'registration',runVersion:0,companies:[],decisions:{},history:[],teams:[],drafts:{},teamMode:true,createdAt:new Date().toISOString()};
+          addTeamSlots(g,parsed.teams.length);g.teams.forEach((t,i)=>Object.assign(t,parsed.teams[i]));state.games[g.code]=g;
+          return {code:g.code,token:teacherToken,role:'teacher',restoredExisting:false};
+        });return send(201,result);
+      }
+      if(url.pathname==='/api/session-packs'&&req.method==='POST'){
+        const b=await body(req),title=textField(b.title,20,'講義名');
+        if(!Number.isInteger(b.teamSlots)||b.teamSlots<1||b.teamSlots>30||!Number.isInteger(b.mainRounds)||b.mainRounds<1||b.mainRounds>4||!Number.isInteger(b.sessionCount)||b.sessionCount<1||b.sessionCount>2)fail(400,'参加枠1〜30、本番1〜4回、セッション数1〜2を指定してください。');
+        return send(201,store.transaction(state=>createSessionPacks(state,{...b,title})));
+      }
+      if(url.pathname==='/api/session-packs/open'&&req.method==='POST'){
+        const b=await body(req),key=normalizeManagementKey(b.managementKey),pack=store.read().sessionPacks?.[key];
+        if(!pack)fail(401,'運営用ゲームキーを確認してください。');return send(200,pack);
+      }
       if(url.pathname==='/api/singleplay'&&req.method==='POST'){
         const b=await body(req),name=textField(b.name,24,'会社名');
         const count=b.computers===undefined?5:b.computers,rounds=b.rounds===undefined?3:b.rounds;
@@ -128,7 +157,7 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
         });
         return send(201, created);
       }
-      const match = url.pathname.match(/^\/api\/games\/((?:s[a-f0-9]{24}|\d{3}|\d{6}))(?:\/(join|decision|settle|next|export|name|draft|teams|team-status|start|leader|team-keys))?$/);
+      const match = url.pathname.match(/^\/api\/games\/((?:s[a-f0-9]{24}|\d{3}|\d{6}))(?:\/(join|decision|settle|next|export|name|draft|teams|team-status|start|leader|team-keys|reset))?$/);
       if (!match) fail(404, '接続先が見つかりません。');
       const [, code, action] = match;
       const g = store.read().games[code];
@@ -168,16 +197,27 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
         const format=url.searchParams.get('format')||'csv';
         if (!['csv','txt'].includes(format)) fail(400, '出力形式はcsvまたはtxtを指定してください。');
         const exportedAt=new Date().toISOString();
-        res.writeHead(200, {'Content-Type':format==='csv'?'text/csv; charset=utf-8':'text/plain; charset=utf-8',
-          'Content-Disposition':`attachment; filename="SmartApps_${code}_${exportedAt.slice(0,10)}.${format}"`});
-        res.end(format==='csv'?exportCsv(g,exportedAt):exportText(g,exportedAt));return;
+        let source=g;const archived=url.searchParams.get('archive');
+        if(archived!==null){if(!/^\d+$/.test(archived)||!g.resetArchives?.[Number(archived)])fail(404,'過去の記録が見つかりません。');source={...g,...g.resetArchives[Number(archived)].snapshot};}
+        res.writeHead(200, {'Content-Type':format==='csv'?'text/csv; charset=utf-8':'text/plain; charset=utf-8','Content-Disposition':`attachment; filename="SmartApps_${code}_${exportedAt.slice(0,10)}.${format}"`});
+        res.end(format==='csv'?exportCsv(source,exportedAt):exportText(source,exportedAt));return;
       }
       if (!action && req.method === 'GET') return send(200, view(g, role, company?.id,member?.id));
       if (req.method !== 'POST') fail(405, 'この操作は利用できません。');
       const b = await body(req);
       const result = store.transaction(state => {
         const game = state.games[code];
+        if(action==='reset'){
+          if(role!=='teacher'||!game.teamMode)fail(403,'チームゲームの運営管理者のみリセットできます。');
+          if(b.runVersion!==(game.runVersion??0))fail(409,'ゲームは既に更新されています。画面を更新してください。');
+          if(!game.history.length||game.phase==='registration')fail(409,'1ラウンド以上集計した後にリセットできます。');
+          const rounds=b.rounds??game.totalRounds;if(!Number.isInteger(rounds)||rounds<1||rounds>4)fail(400,'ラウンド数は1〜4を指定してください。');
+          game.resetArchives??=[];game.resetArchives.push({at:new Date().toISOString(),snapshot:{history:structuredClone(game.history),decisions:structuredClone(game.decisions),drafts:structuredClone(game.drafts),round:game.round,phase:game.phase,totalRounds:game.totalRounds,runVersion:game.runVersion??0}});
+          game.round=1;game.phase='deciding';game.totalRounds=rounds;game.history=[];game.decisions={};game.drafts={};game.runVersion=(game.runVersion??0)+1;
+          return view(game,role,company?.id,member?.id);
+        }
         if(game.teamMode){
+          if(['draft','decision','settle','next'].includes(action)&&(b.runVersion??0)!==(game.runVersion??0))fail(409,'ゲームがリセットされました。最新の画面で選び直してください。');
           const t=game.teams.find(t=>t.id===company?.id);
           const leader=t&&t.leaderId===member?.id;
           const isAdmin=role==='teacher';
@@ -186,7 +226,11 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
             if(action!=='leader'&&game.phase!=='registration')fail(409,'参加受付は終了しました。');
             if(action==='teams'){
               if(!Number.isInteger(b.count)||b.count<1||game.teams.length+b.count>30)fail(400,'合計30チームまで追加できます。');
-              addTeamSlots(game,b.count);
+              if(game.packKey){
+                const pair=state.sessionPacks[game.packKey].games.map(g=>state.games[g.code]);
+                if(pair.some(g=>g.phase!=='registration'))fail(409,'プレまたは本番を開始した後は参加枠を追加できません。事前に予備枠を用意してください。');
+                const other=pair.find(g=>g.code!==game.code),before=game.teams.length;addTeamSlots(game,b.count);addTeamSlots(other,b.count);other.teams.slice(before).forEach((t,i)=>t.key=game.teams[before+i].key);
+              }else addTeamSlots(game,b.count);
             }
             if(action==='team-status'){
               const target=game.teams.find(t=>t.id===b.companyId);if(!target||typeof b.excluded!=='boolean')fail(400,'チームを確認してください。');target.excluded=b.excluded;
