@@ -1,4 +1,5 @@
 import {parseTeamCsv} from './team-csv.js';
+import {rememberTeacher,managementAuth,mountGameManager} from './game-manager.js';
 import { breakEvenChart, cumulativeChart } from './charts.js';
 import { roundRanking, modelCompanies } from './rankings.js';
 const app = document.querySelector('#app');
@@ -58,6 +59,7 @@ async function api(path, data, auth = session) {
   return payload;
 }
 function saveSession(value) {
+  rememberTeacher(value);
   session = value;
   const key = value.mode==='single'?'singleplay':value.role === 'teacher' ? 'teacher' : 'student';
   sessionStorage.setItem(key, JSON.stringify(value));
@@ -305,7 +307,8 @@ app.addEventListener('submit', e => {
   if(form.id==='csv-import-form')run(async()=>{
     if(!importedCsv)throw new Error('CSVを選び、読み取り結果を確認してください。');
     let prior;try{prior=JSON.parse(sessionStorage.getItem('teacher')||localStorage.getItem('teacher')||'null');}catch{}
-    const code=parseTeamCsv(importedCsv).code,auth=[session,prior,...savedPacks().flatMap(p=>p.games)].find(s=>s?.role==='teacher'&&s.code===code);
+    let known=[];try{known=JSON.parse(localStorage.getItem('teacher-games')||'[]');}catch{}
+    const code=parseTeamCsv(importedCsv).code,auth=managementAuth()||[session,prior,...known,...savedPacks().flatMap(p=>p.games)].find(s=>s?.role==='teacher'&&s.code===code);
     const value=await api('/api/games/import',{csv:importedCsv,title:data.title,rounds:Number(data.rounds)},auth||null);
     saveSession(value);location.assign('/admin.html');
   });
@@ -376,5 +379,11 @@ app.addEventListener('click', e => {
   }
 });
 if (session) { sessionStorage.setItem(role, JSON.stringify(session)); refresh(true); } else renderHome();
+if(teacherEntry){
+  if(session)rememberTeacher(session);
+  mountGameManager({base,onOpen:value=>{saveSession(value);location.assign('/admin.html');},onArchive:async code=>{
+    if(session?.code===code){++requestVersion;clearSession();draftKey='';draftDirty=false;clearTimeout(draftTimer);document.body.classList.remove('offline');}
+  }});
+}
 setInterval(() => { if (session && !document.hidden) refresh(); }, 3000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && session) refresh(); });

@@ -3,7 +3,7 @@ import {createSessionPacks,normalizeManagementKey} from './lib/session-packs.js'
 import {addTeamSlots,joinTeam,teamForToken,registrationTeams} from './lib/teams.js';
 import { computerDecisions } from './lib/computers.js';
 import { createServer } from 'node:http';
-import { randomBytes, randomInt, randomUUID } from 'node:crypto';
+import { randomBytes, randomInt, randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
@@ -18,11 +18,20 @@ const root = dirname(fileURLToPath(import.meta.url));
 const fail = (status, message) => { throw Object.assign(new Error(message), { status }); };
 const token = () => randomBytes(32).toString('hex');
 
-export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'data'), allowedOrigins = process.env.ALLOWED_ORIGINS || '' } = {}) {
+export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'data'), allowedOrigins = process.env.ALLOWED_ORIGINS || '', adminPassword = process.env.ADMIN_PASSWORD || '' } = {}) {
   const store = createStore(dataDir);
+  const managementSessions = new Map(), loginFailures = new Map();
+  const digest = value => createHash('sha256').update(value).digest();
+  const instanceId = g => digest(g.teacherToken).toString('hex');
+  const summary = g => ({code:g.code,title:g.title,phase:g.phase,round:g.round,rounds:g.totalRounds??3,createdAt:g.createdAt,teamCount:g.teamMode?g.teams.length:g.companies.length,registeredCount:g.teamMode?registrationTeams(g).length:g.companies.length,instanceId:instanceId(g)});
+  function archiveGame(state,code) {
+    const g=state.games[code],id=randomUUID();
+    state.archivedGames??={};state.archivedGames[id]={id,archivedAt:new Date().toISOString(),game:g};
+    delete state.games[code];return id;
+  }
   const origins = allowedOrigins.split(',').map(s => s.trim()).filter(Boolean);
   const files = { '/': ['index.html', 'text/html'], '/teacher': ['admin.html', 'text/html'], '/admin.html': ['admin.html','text/html'], '/index.html': ['index.html','text/html'], '/student.html': ['student.html','text/html'],
-    '/team-csv.js':['team-csv.js','text/javascript'], '/tickets.html':['tickets.html','text/html'], '/tickets.js':['tickets.js','text/javascript'], '/tickets.css':['tickets.css','text/css'], '/singleplay.html': ['singleplay.html','text/html'], '/play': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'],
+    '/game-manager.js':['game-manager.js','text/javascript'], '/team-csv.js':['team-csv.js','text/javascript'], '/tickets.html':['tickets.html','text/html'], '/tickets.js':['tickets.js','text/javascript'], '/tickets.css':['tickets.css','text/css'], '/singleplay.html': ['singleplay.html','text/html'], '/play': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'],
     '/charts.js': ['charts.js', 'text/javascript'], '/rankings.js': ['rankings.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'], '/config.js': ['config.js', 'text/javascript'],
     '/vendor/qrcode.js':['vendor/qrcode.js','text/javascript'], '/favicon.svg': ['favicon.svg', 'image/svg+xml'] };
 
@@ -97,12 +106,57 @@ export function createApp({ dataDir = process.env.DATA_DIR || resolve(root, 'dat
         res.writeHead(200, { 'Content-Type': `${mime}; charset=utf-8` });
         res.end(readFileSync(resolve(root, 'public', file))); return;
       }
+      if(url.pathname==='/api/admin/session/end'&&req.method==='POST'){
+        managementSessions.delete(req.headers.authorization?.replace(/^Bearer /,''));return send(200,{ok:true});
+      }
+      if(url.pathname==='/api/admin/session'&&req.method==='POST'){
+        if(!adminPassword)fail(503,'全ゲームを管理するには、Renderの環境変数 ADMIN_PASSWORD を設定してください。このブラウザで保存したゲームは、パスワードなしで管理できます。');
+        const address=req.socket.remoteAddress,now=Date.now();
+        const attempt=loginFailures.get(address);
+        if(attempt&&attempt.until>now&&attempt.count>=10)fail(429,'入力が続けて一致しませんでした。15分後に再試行してください。');
+        const b=await body(req);
+        if(typeof b.password!=='string'||!timingSafeEqual(digest(b.password),digest(adminPassword))){
+          loginFailures.set(address,{count:attempt?.until>now?attempt.count+1:1,until:attempt?.until>now?attempt.until:now+15*60*1000});
+          fail(401,'運営専用パスワードが一致しません。');
+        }
+        loginFailures.delete(address);
+        for(const [key,expires]of managementSessions)if(expires<=now)managementSessions.delete(key);
+        const key=token();managementSessions.set(key,now+12*60*60*1000);return send(200,{token:key});
+      }
+      if(url.pathname.startsWith('/api/admin/games')&&req.method==='POST'){
+        const b=await body(req,65536),auth=req.headers.authorization?.replace(/^Bearer /,'');
+        const all=(managementSessions.get(auth)||0)>Date.now();
+        const owned=new Set(Array.isArray(b.tokens)?b.tokens.filter(v=>typeof v==='string').slice(0,900):[]);
+        if(auth)owned.add(auth);
+        const authorized=g=>all||owned.has(g.teacherToken);
+        if(url.pathname==='/api/admin/games/list'){
+          const state=store.read();
+          return send(200,{allGames:all,passwordConfigured:!!adminPassword,games:Object.values(state.games).filter(g=>g.mode!=='single'&&authorized(g)).map(summary).sort((a,b)=>a.code.localeCompare(b.code)),archives:Object.values(state.archivedGames||{}).filter(a=>authorized(a.game)).map(a=>({...summary(a.game),archiveId:a.id,archivedAt:a.archivedAt})).sort((a,b)=>b.archivedAt.localeCompare(a.archivedAt))});
+        }
+        const manage=url.pathname.match(/^\/api\/admin\/games\/((?:\d{3}|\d{6}))\/(open|archive|restore)$/);
+        if(!manage)fail(404,'操作が見つかりません。');
+        const [,code,operation]=manage;
+        const g=operation==='restore'?store.read().archivedGames?.[b.archiveId]?.game:store.read().games[code];
+        if(!g||g.code!==code||!authorized(g))fail(403,'このゲームの管理権限を確認できません。全ゲームの管理を有効にするか、作成したブラウザから操作してください。');
+        if(b.instanceId!==instanceId(g))fail(409,'ゲームが更新されています。一覧を読み直してください。');
+        if(operation==='open')return send(200,{code,token:g.teacherToken,role:'teacher'});
+        if(b.confirmCode!==code)fail(400,'確認欄に対象のゲーム番号を入力してください。');
+        if(operation==='archive'){
+          const archiveId=store.transaction(state=>archiveGame(state,code));return send(200,{archived:true,archiveId,code});
+        }
+        const restored=store.transaction(state=>{
+          if(state.games[code])fail(409,'この番号は既に別のゲームで使われています。現在のゲームを無効化してから戻してください。');
+          state.games[code]=state.archivedGames[b.archiveId].game;delete state.archivedGames[b.archiveId];
+          return {code,token:state.games[code].teacherToken,role:'teacher'};
+        });return send(200,restored);
+      }
       if(url.pathname==='/api/games/import'&&req.method==='POST'){
         const b=await body(req,65536);let parsed;
         try{parsed=parseTeamCsv(b.csv);}catch(e){fail(400,e.message);}
         const existing=store.read().games[parsed.code];
         if(existing){
-          if(req.headers.authorization!==`Bearer ${existing.teacherToken}`)fail(409,'このゲーム番号は使用中です。該当ゲームの運営画面から読み込んでください。CSVだけで運営権限を取得することはできません。');
+          const auth=req.headers.authorization?.replace(/^Bearer /,'');
+          if(auth!==existing.teacherToken&&(managementSessions.get(auth)||0)<=Date.now())fail(409,'この番号は登録済みです。管理画面の「作成済みゲームの管理」から該当ゲームを開くか、無効化してからCSVを読み込んでください。別のブラウザで作成した場合は運営専用パスワードで全ゲームを表示できます。');
           if(!existing.teamMode||existing.teams.length!==parsed.teams.length||existing.teams.some(t=>!parsed.teams.some(p=>p.key===t.key)))fail(409,'既存ゲームのチームキーと一致しません。現在のゲームは変更していません。');
           return send(200,{code:existing.code,token:existing.teacherToken,role:'teacher',restoredExisting:true});
         }
